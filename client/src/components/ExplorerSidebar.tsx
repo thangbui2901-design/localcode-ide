@@ -4,6 +4,8 @@ import {
   FolderPlus,
   RefreshCw,
   Trash2,
+  Pencil,
+  Upload,
   ChevronRight,
   ChevronDown,
   X
@@ -18,6 +20,8 @@ interface ExplorerSidebarProps {
   onSelectFile: (file: WorkspaceFile) => void;
   onCreateFile: (relPath: string) => Promise<void> | void;
   onCreateFolder: (relPath: string) => Promise<void> | void;
+  onRenameEntry?: (oldPath: string, newPath: string) => Promise<void> | void;
+  onImportCodeFiles?: (files: FileList) => Promise<void> | void;
   onDeleteEntry: (relPath: string) => Promise<void> | void;
   onRefresh: () => void;
   onCloseMobile?: () => void;
@@ -31,6 +35,8 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
   onSelectFile,
   onCreateFile,
   onCreateFolder,
+  onRenameEntry,
+  onImportCodeFiles,
   onDeleteEntry,
   onRefresh,
   onCloseMobile,
@@ -42,7 +48,13 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
     parentPath: string;
   } | null>(null);
   const [draftName, setDraftName] = useState('');
+  const [renaming, setRenaming] = useState<{
+    oldPath: string;
+    isFolder: boolean;
+  } | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   // Mặc định mở sẵn các thư mục cấp 1
   useEffect(() => {
@@ -65,7 +77,17 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
     }
   }, [creating]);
 
+  useEffect(() => {
+    if (renaming) {
+      window.setTimeout(() => {
+        renameInputRef.current?.focus();
+        renameInputRef.current?.select();
+      }, 20);
+    }
+  }, [renaming]);
+
   const startCreate = (type: 'file' | 'folder', parentPath = '') => {
+    setRenaming(null);
     if (parentPath) {
       setExpandedFolders((prev) => ({ ...prev, [parentPath]: true }));
     }
@@ -87,6 +109,28 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
       await onCreateFile(fullPath);
     } else {
       await onCreateFolder(fullPath);
+    }
+  };
+
+  const startRename = (node: FileNode) => {
+    setCreating(null);
+    setRenaming({ oldPath: node.path, isFolder: node.type === 'folder' });
+    setRenameDraft(node.name);
+  };
+
+  const commitRename = async () => {
+    if (!renaming) return;
+    const current = renaming;
+    const trimmed = renameDraft.trim().replace(/[\\/:*?"<>|]+/g, '');
+    setRenaming(null);
+    setRenameDraft('');
+
+    if (!trimmed || !onRenameEntry) return;
+    const parts = current.oldPath.split('/');
+    parts[parts.length - 1] = trimmed;
+    const nextPath = parts.join('/');
+    if (nextPath !== current.oldPath) {
+      await onRenameEntry(current.oldPath, nextPath);
     }
   };
 
@@ -131,59 +175,99 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
   };
 
   const renderNode = (node: FileNode, depth = 0) => {
+    const isBeingRenamed = renaming?.oldPath === node.path;
+
     if (node.type === 'folder') {
       const isExpanded = Boolean(expandedFolders[node.path]);
       return (
         <div key={node.path}>
           <div
-            onClick={() =>
-              setExpandedFolders((prev) => ({ ...prev, [node.path]: !isExpanded }))
-            }
+            onClick={() => {
+              if (!isBeingRenamed) {
+                setExpandedFolders((prev) => ({ ...prev, [node.path]: !isExpanded }));
+              }
+            }}
             style={{ paddingLeft: `${depth * 14 + 8}px` }}
             className="group h-8 pr-2 rounded-xl flex items-center justify-between gap-1 cursor-pointer hover:bg-[var(--bg-hover)] text-xs transition-colors"
           >
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <span style={{ color: 'var(--text-secondary)' }} className="shrink-0">
                 {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               </span>
               <FileTypeIcon fileName={node.name} isFolder isOpen={isExpanded} size={16} />
-              <span
-                style={{ color: 'var(--text-primary)' }}
-                className="font-medium truncate"
-              >
-                {node.name}
-              </span>
+              {isBeingRenamed ? (
+                <input
+                  ref={renameInputRef}
+                  type="text"
+                  value={renameDraft}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitRename();
+                    } else if (e.key === 'Escape') {
+                      setRenaming(null);
+                    }
+                  }}
+                  onBlur={commitRename}
+                  style={{
+                    backgroundColor: 'var(--bg-elevated)',
+                    color: 'var(--text-primary)'
+                  }}
+                  className="flex-1 min-w-0 h-6 px-1.5 rounded-md text-xs outline-none ring-1 ring-[var(--accent-primary)]"
+                />
+              ) : (
+                <span
+                  style={{ color: 'var(--text-primary)' }}
+                  className="font-medium truncate"
+                >
+                  {node.name}
+                </span>
+              )}
             </div>
 
-            <div
-              className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => startCreate('file', node.path)}
-                className="p-1 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                title="Tạo tệp trong thư mục này"
+            {!isBeingRenamed && (
+              <div
+                className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
               >
-                <FilePlus size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => startCreate('folder', node.path)}
-                className="p-1 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                title="Tạo thư mục con"
-              >
-                <FolderPlus size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onDeleteEntry(node.path)}
-                className="p-1 rounded-md hover:bg-rose-500/15 text-[var(--text-secondary)] hover:text-rose-500"
-                title="Xóa thư mục"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => startCreate('file', node.path)}
+                  className="p-1 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  title="Tạo tệp trong thư mục này"
+                >
+                  <FilePlus size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startCreate('folder', node.path)}
+                  className="p-1 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  title="Tạo thư mục con"
+                >
+                  <FolderPlus size={12} />
+                </button>
+                {onRenameEntry && (
+                  <button
+                    type="button"
+                    onClick={() => startRename(node)}
+                    className="p-1 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-sky-400"
+                    title="Đổi tên thư mục"
+                  >
+                    <Pencil size={11} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onDeleteEntry(node.path)}
+                  className="p-1 rounded-md hover:bg-rose-500/15 text-[var(--text-secondary)] hover:text-rose-500"
+                  title="Xóa thư mục"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            )}
           </div>
 
           {isExpanded && (
@@ -203,42 +287,88 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
       <div
         key={node.path}
         onClick={() => {
-          if (fileObj) onSelectFile(fileObj);
+          if (!isBeingRenamed && fileObj) onSelectFile(fileObj);
         }}
-        style={{ paddingLeft: `${depth * 14 + 22}px` }}
-        className={`group h-8 pr-2 rounded-xl flex items-center justify-between gap-1.5 cursor-pointer text-xs transition-colors ${
+        style={{
+          paddingLeft: `${depth * 14 + 20}px`,
+          backgroundColor: isSelected ? 'var(--bg-active)' : undefined,
+          color: 'var(--text-primary)'
+        }}
+        className={`group h-7 pr-2 rounded-lg flex items-center justify-between gap-1.5 cursor-pointer text-xs transition-colors relative ${
           isSelected
-            ? 'accent-pill-active font-semibold'
-            : 'hover:bg-[var(--bg-hover)] text-[var(--text-primary)]'
+            ? 'font-semibold'
+            : 'hover:bg-[var(--bg-hover)]/70 opacity-90 hover:opacity-100'
         }`}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <FileTypeIcon fileName={node.name} size={16} />
-          <span className="truncate">{node.name}</span>
-          {fileObj?.dirty && (
-            <span
-              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                isSelected ? 'bg-white' : 'bg-[var(--accent-primary)]'
-              }`}
+        {isSelected && (
+          <span
+            aria-hidden="true"
+            style={{ backgroundColor: 'var(--accent-primary)' }}
+            className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-r-full"
+          />
+        )}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <FileTypeIcon fileName={node.name} size={15} />
+          {isBeingRenamed ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameDraft}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setRenameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitRename();
+                } else if (e.key === 'Escape') {
+                  setRenaming(null);
+                }
+              }}
+              onBlur={commitRename}
+              style={{
+                backgroundColor: 'var(--bg-elevated)',
+                color: 'var(--text-primary)'
+              }}
+              className="flex-1 min-w-0 h-6 px-1.5 rounded-md text-xs outline-none ring-1 ring-[var(--accent-primary)]"
             />
+          ) : (
+            <>
+              <span className="truncate">{node.name}</span>
+              {fileObj?.dirty && (
+                <span
+                  style={{ backgroundColor: 'var(--accent-primary)' }}
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                />
+              )}
+            </>
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDeleteEntry(node.path);
-          }}
-          className={`opacity-0 group-hover:opacity-100 p-1 rounded-md shrink-0 transition-opacity ${
-            isSelected
-              ? 'hover:bg-white/20 text-white'
-              : 'hover:bg-rose-500/15 text-[var(--text-secondary)] hover:text-rose-500'
-          }`}
-          title="Xóa tệp"
-        >
-          <Trash2 size={12} />
-        </button>
+        {!isBeingRenamed && (
+          <div
+            className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {onRenameEntry && (
+              <button
+                type="button"
+                onClick={() => startRename(node)}
+                className="p-1 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                title="Đổi tên tệp"
+              >
+                <Pencil size={11} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onDeleteEntry(node.path)}
+              className="p-1 rounded-md hover:bg-rose-500/15 text-[var(--text-secondary)] hover:text-rose-400"
+              title="Xóa tệp"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -274,6 +404,28 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
           >
             <FolderPlus size={14} />
           </button>
+
+          {onImportCodeFiles && (
+            <label
+              style={{ color: 'var(--text-secondary)' }}
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-emerald-400 transition-colors cursor-pointer"
+              title="Mở / Nhập tệp code lẻ từ máy (iPad Files)"
+            >
+              <Upload size={13} />
+              <input
+                type="file"
+                multiple
+                accept=".cpp,.cc,.cxx,.c,.h,.hpp,.py,.html,.htm,.css,.js,.mjs,.json,.md,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    onImportCodeFiles(e.target.files);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+          )}
 
           <button
             type="button"

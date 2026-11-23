@@ -18,9 +18,16 @@ interface StoredFolderRecord {
 }
 
 export function detectLanguageFromName(fileName: string): SupportedLanguage {
-  if (fileName.endsWith('.py')) return 'python';
-  if (fileName.endsWith('.c')) return 'c';
-  if (fileName.endsWith('.md')) return 'markdown';
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.py')) return 'python';
+  if (lower.endsWith('.c')) return 'c';
+  if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
+  if (lower.endsWith('.css')) return 'css';
+  if (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.jsx')) return 'javascript';
+  if (lower.endsWith('.json')) return 'json';
+  if (lower.endsWith('.md')) return 'markdown';
+  if (/\.(txt|in|inp|out|csv|dat|log)$/i.test(lower)) return 'plaintext';
+  if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|woff2?|ttf|otf)$/i.test(lower)) return 'asset';
   return 'cpp';
 }
 
@@ -198,7 +205,8 @@ export async function loadIdbWorkspace(): Promise<{ tree: FileNode[]; files: Wor
       path: f.path,
       uri: `file:///workspace/${f.path}`,
       content: f.content,
-      language: detectLanguageFromName(f.name)
+      language: detectLanguageFromName(f.name),
+      updatedAt: f.updatedAt || Date.now()
     }));
 
   const folderSet = new Set<string>(rawFolders.map((f) => f.path));
@@ -233,13 +241,21 @@ export async function loadIdbWorkspace(): Promise<{ tree: FileNode[]; files: Wor
       name: file.name,
       path: file.path,
       type: 'file',
-      file
+      file,
+      updatedAt: file.updatedAt
     };
     if (parts.length === 1) {
       rootNodes.push(fileNode);
     } else {
       const parentPath = parts.slice(0, -1).join('/');
       folderNodeMap.get(parentPath)?.children?.push(fileNode);
+      // Lan truyền thời gian cập nhật mới nhất lên các thư mục cha
+      for (let i = 1; i < parts.length; i++) {
+        const ancestor = folderNodeMap.get(parts.slice(0, i).join('/'));
+        if (ancestor && file.updatedAt && (!ancestor.updatedAt || file.updatedAt > ancestor.updatedAt)) {
+          ancestor.updatedAt = file.updatedAt;
+        }
+      }
     }
   }
 
@@ -318,6 +334,53 @@ export async function deleteIdbEntry(relPath: string): Promise<void> {
   for (const d of allFolders) {
     if (d.path === relPath || d.path.startsWith(`${relPath}/`)) {
       folderStore.delete(d.path);
+    }
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function renameIdbEntry(oldPath: string, newPath: string): Promise<void> {
+  const cleanOld = oldPath.replace(/^\/+|\/+$/g, '');
+  const cleanNew = newPath.replace(/^\/+|\/+$/g, '');
+  if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
+
+  const db = await openDatabase();
+  const allFiles = await getAllRecords<StoredFileRecord>(db, STORE_FILES);
+  const allFolders = await getAllRecords<StoredFolderRecord>(db, STORE_FOLDERS);
+
+  const tx = db.transaction([STORE_FILES, STORE_FOLDERS], 'readwrite');
+  const fileStore = tx.objectStore(STORE_FILES);
+  const folderStore = tx.objectStore(STORE_FOLDERS);
+
+  const now = Date.now();
+  const newParts = cleanNew.split('/');
+  for (let i = 1; i < newParts.length; i++) {
+    folderStore.put({ path: newParts.slice(0, i).join('/') });
+  }
+
+  for (const f of allFiles) {
+    if (f.path === cleanOld || f.path.startsWith(`${cleanOld}/`)) {
+      const nextPath = f.path === cleanOld ? cleanNew : `${cleanNew}${f.path.slice(cleanOld.length)}`;
+      const nextName = nextPath.split('/').pop() || nextPath;
+      fileStore.delete(f.path);
+      fileStore.put({
+        path: nextPath,
+        name: nextName,
+        content: f.content,
+        updatedAt: now
+      });
+    }
+  }
+
+  for (const d of allFolders) {
+    if (d.path === cleanOld || d.path.startsWith(`${cleanOld}/`)) {
+      const nextFolder = d.path === cleanOld ? cleanNew : `${cleanNew}${d.path.slice(cleanOld.length)}`;
+      folderStore.delete(d.path);
+      folderStore.put({ path: nextFolder });
     }
   }
 

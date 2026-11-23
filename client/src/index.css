@@ -8,19 +8,20 @@
 
 :root,
 [data-ui-theme='midnight-indigo'] {
-  --bg-canvas: #090814;
-  --bg-panel: #111022;
-  --bg-panel-alt: #17152e;
-  --bg-elevated: #1e1c3b;
-  --bg-hover: #28254d;
-  --bg-active: rgba(124, 92, 255, 0.22);
-  --text-primary: #eceaf8;
-  --text-secondary: #928eb0;
-  --accent-primary: #7c5cff;
-  --accent-secondary: #9d7bff;
-  --accent-glow: rgba(124, 92, 255, 0.38);
-  --shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.65);
-  --editor-bg: #111022;
+  --bg-canvas: #080c18;
+  --bg-panel: #0e1426;
+  --bg-panel-alt: #131b31;
+  --bg-elevated: #1a2442;
+  --bg-hover: #233058;
+  --bg-active: rgba(59, 130, 246, 0.18);
+  --border-subtle: rgba(148, 163, 184, 0.14);
+  --text-primary: #f1f5f9;
+  --text-secondary: #8b9bb8;
+  --accent-primary: #3b82f6;
+  --accent-secondary: #38bdf8;
+  --accent-glow: rgba(59, 130, 246, 0.36);
+  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.65);
+  --editor-bg: #0d1326;
 }
 
 [data-ui-theme='cyber-emerald'] {
@@ -30,12 +31,13 @@
   --bg-elevated: #172b26;
   --bg-hover: #1f3b33;
   --bg-active: rgba(16, 185, 129, 0.2);
+  --border-subtle: rgba(52, 211, 153, 0.14);
   --text-primary: #e6f7f1;
   --text-secondary: #84a89c;
   --accent-primary: #10b981;
   --accent-secondary: #34d399;
   --accent-glow: rgba(16, 185, 129, 0.36);
-  --shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
   --editor-bg: #0c1714;
 }
 
@@ -46,12 +48,13 @@
   --bg-elevated: #2a2c3b;
   --bg-hover: #35384b;
   --bg-active: rgba(189, 147, 249, 0.22);
+  --border-subtle: rgba(189, 147, 249, 0.14);
   --text-primary: #f8f8f2;
   --text-secondary: #9ea4c4;
   --accent-primary: #bd93f9;
   --accent-secondary: #ff79c6;
   --accent-glow: rgba(189, 147, 249, 0.36);
-  --shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.65);
+  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.65);
   --editor-bg: #1b1c26;
 }
 
@@ -62,28 +65,30 @@
   --bg-elevated: #2d2d30;
   --bg-hover: #37373d;
   --bg-active: rgba(14, 165, 233, 0.22);
+  --border-subtle: rgba(255, 255, 255, 0.08);
   --text-primary: #e4e4e7;
   --text-secondary: #9ca3af;
   --accent-primary: #0ea5e9;
   --accent-secondary: #38bdf8;
   --accent-glow: rgba(14, 165, 233, 0.34);
-  --shadow-card: 0 10px 28px -12px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 10px 28px -14px rgba(0, 0, 0, 0.6);
   --editor-bg: #1e1e1e;
 }
 
 [data-ui-theme='lavender-light'] {
-  --bg-canvas: #eaecf6;
+  --bg-canvas: #eef1f8;
   --bg-panel: #ffffff;
-  --bg-panel-alt: #f3f4fb;
-  --bg-elevated: #e9ecf8;
-  --bg-hover: #dfe3f3;
-  --bg-active: rgba(109, 74, 255, 0.14);
-  --text-primary: #17162b;
-  --text-secondary: #5f5c7d;
-  --accent-primary: #6d4aff;
-  --accent-secondary: #8668ff;
-  --accent-glow: rgba(109, 74, 255, 0.25);
-  --shadow-card: 0 10px 28px -12px rgba(34, 28, 74, 0.12);
+  --bg-panel-alt: #f5f7fc;
+  --bg-elevated: #e8edf7;
+  --bg-hover: #dce3f2;
+  --bg-active: rgba(59, 130, 246, 0.14);
+  --border-subtle: rgba(15, 23, 42, 0.09);
+  --text-primary: #0f172a;
+  --text-secondary: #5c6b88;
+  --accent-primary: #2563eb;
+  --accent-secondary: #3b82f6;
+  --accent-glow: rgba(37, 99, 235, 0.24);
+  --shadow-card: 0 10px 28px -14px rgba(15, 23, 42, 0.12);
   --editor-bg: #ffffff;
 }
 
@@ -94,25 +99,61 @@
   --bg-elevated: #eae1c5;
   --bg-hover: #dfd5b6;
   --bg-active: rgba(217, 119, 6, 0.16);
+  --border-subtle: rgba(88, 74, 38, 0.14);
   --text-primary: #2c3539;
   --text-secondary: #657b83;
   --accent-primary: #d97706;
   --accent-secondary: #f59e0b;
   --accent-glow: rgba(217, 119, 6, 0.26);
-  --shadow-card: 0 10px 26px -12px rgba(88, 74, 38, 0.14);
+  --shadow-card: 0 10px 26px -14px rgba(88, 74, 38, 0.14);
   --editor-bg: #fdf6e3;
+}
+
+:root {
+  --ease-ios-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-ios-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-ios-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --font-apple-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-apple-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+    'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  touch-action: manipulation;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   background-color: var(--bg-canvas);
   color: var(--text-primary);
-  transition: background-color 0.25s ease, color 0.25s ease;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.28s var(--ease-ios-out), color 0.28s var(--ease-ios-out);
+  font-family: var(--font-apple-ui);
+  letter-spacing: -0.008em;
   overscroll-behavior: none;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-apple-display);
+  letter-spacing: -0.022em;
+}
+
+.font-mono,
+.code-font,
+.terminal-font,
+code,
+pre {
+  letter-spacing: normal;
 }
 
 #root {
@@ -123,17 +164,18 @@ body {
 
 .ide-card {
   background-color: var(--bg-panel);
-  border: none !important;
-  border-radius: 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
   box-shadow: var(--shadow-card);
   transition:
-    background-color 0.25s ease,
-    border-radius 0.25s ease,
-    box-shadow 0.25s ease;
+    background-color 0.28s var(--ease-ios-out),
+    border-color 0.28s var(--ease-ios-out),
+    border-radius 0.28s var(--ease-ios-out),
+    box-shadow 0.28s var(--ease-ios-out);
 }
 
 [data-ui-density='compact'] .ide-card {
-  border-radius: 10px;
+  border-radius: 0px;
   box-shadow: none;
 }
 
@@ -141,7 +183,14 @@ body {
   background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 6px 18px -4px var(--accent-glow);
+  box-shadow: 0 6px 18px -5px var(--accent-glow);
+}
+
+.run-btn {
+  background: linear-gradient(135deg, #10b981 0%, #2dd4bf 100%);
+  color: #052e23 !important;
+  border: none !important;
+  box-shadow: 0 6px 18px -5px rgba(16, 185, 129, 0.45);
 }
 
 .accent-pill-active {
@@ -153,42 +202,654 @@ body {
 
 .btn-lift {
   transition:
-    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.24s var(--ease-ios-bounce),
+    box-shadow 0.22s var(--ease-ios-out),
     background-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    opacity 0.2s ease;
+  will-change: transform;
 }
 
-.btn-lift:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px -4px var(--accent-glow);
+@media (hover: hover) and (pointer: fine) {
+  .btn-lift:hover:not(:disabled) {
+    transform: translateY(-1.5px);
+    box-shadow: 0 8px 20px -4px var(--accent-glow);
+  }
 }
 
 .btn-lift:active:not(:disabled) {
-  transform: translateY(0px) scale(0.97);
+  transform: scale(0.94);
+  opacity: 0.9;
 }
 
 .tab-pill {
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    transform 0.24s var(--ease-ios-bounce),
+    background-color 0.22s var(--ease-ios-out),
+    color 0.22s var(--ease-ios-out),
+    box-shadow 0.22s var(--ease-ios-out);
 }
 
-.tab-pill:hover {
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .tab-pill:hover {
+    transform: translateY(-1px);
+  }
 }
 
-@keyframes tabContentFadeSlide {
+.tab-pill:active {
+  transform: scale(0.95);
+}
+
+/* =====================================================================
+   NATIVE iOS / iPadOS SPRING ANIMATIONS (GPU-COMPOSITED 60/120Hz)
+   ===================================================================== */
+
+@keyframes iosFadeSlide {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.996);
+    transform: translate3d(0, 10px, 0) scale(0.988);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes iosBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes iosDrawerLeftIn {
+  from {
+    opacity: 0.7;
+    transform: translate3d(-104%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes iosSheetUpIn {
+  from {
+    opacity: 0.65;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes iosModalSpringIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0) scale(0.93);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes iosPopoverIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes iosToastSpringIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes iosNavPop {
+  0% {
+    transform: scale(0.84);
+  }
+  60% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
 .tab-content-enter {
-  animation: tabContentFadeSlide 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: iosFadeSlide 0.3s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.ios-backdrop-enter {
+  animation: iosBackdropIn 0.26s var(--ease-ios-out) both;
+  will-change: opacity;
+}
+
+.ios-drawer-enter {
+  animation: iosDrawerLeftIn 0.38s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.ios-sheet-enter {
+  animation: iosSheetUpIn 0.4s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.ios-modal-enter {
+  animation: iosModalSpringIn 0.36s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.ios-popover-enter {
+  transform-origin: top right;
+  animation: iosPopoverIn 0.28s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.ios-toast-enter {
+  animation: iosToastSpringIn 0.42s var(--ease-ios-bounce) both;
+  will-change: transform, opacity;
+}
+
+.ios-nav-icon-active {
+  animation: iosNavPop 0.34s var(--ease-ios-bounce) both;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* =====================================================================
+   HOME HERO AMBIENT ANIMATION
+   ===================================================================== */
+
+@keyframes heroFloatBreath {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -4px, 0) scale(1.03);
+  }
+}
+
+.hero-icon-float {
+  animation: heroFloatBreath 4.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* =====================================================================
+   ANIMATED LAUNCH SPLASH SCREEN (CARTOON SPRING LOGO MOTION)
+   ===================================================================== */
+
+@keyframes splashSquirclePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-8deg);
+  }
+  52% {
+    opacity: 1;
+    transform: scale(1.08, 0.94) rotate(2deg);
+  }
+  74% {
+    transform: scale(0.96, 1.04) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1, 1) rotate(0deg);
+  }
+}
+
+@keyframes splashBracketLeft {
+  0% {
+    opacity: 0;
+    transform: translate3d(-24px, 0, 0) scale(0.75);
+  }
+  65% {
+    opacity: 1;
+    transform: translate3d(3px, 0, 0) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes splashBracketRight {
+  0% {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0) scale(0.75);
+  }
+  65% {
+    opacity: 1;
+    transform: translate3d(-3px, 0, 0) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes splashSlashDraw {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -18px, 0) scaleY(0.2);
+  }
+  68% {
+    opacity: 1;
+    transform: translate3d(0, 2px, 0) scaleY(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleY(1);
+  }
+}
+
+@keyframes splashPlayBounce {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-25deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.26, 0.84) rotate(8deg);
+  }
+  75% {
+    transform: scale(0.9, 1.12) rotate(-4deg);
+  }
+  90% {
+    transform: scale(1.04, 0.97) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1, 1) rotate(0deg);
+  }
+}
+
+@keyframes splashSparkBurst {
+  0% {
+    opacity: 0;
+    transform: scale(0) translate3d(0, 0, 0);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.15) translate3d(var(--tx, 0px), var(--ty, 0px), 0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.2) translate3d(calc(var(--tx, 0px) * 1.5), calc(var(--ty, 0px) * 1.5), 0);
+  }
+}
+
+@keyframes splashShimmerSweep {
+  0% {
+    transform: translateX(-140%) skewX(-24deg);
+  }
+  100% {
+    transform: translateX(240%) skewX(-24deg);
+  }
+}
+
+@keyframes splashGlowPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+}
+
+@keyframes splashTextRise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.splash-squircle-pop {
+  animation: splashSquirclePop 0.56s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.splash-bracket-left {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: splashBracketLeft 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+}
+
+.splash-bracket-right {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: splashBracketRight 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+}
+
+.splash-slash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: splashSlashDraw 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.32s both;
+}
+
+.splash-play-bounce {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: splashPlayBounce 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) 0.48s both;
+}
+
+.splash-spark {
+  animation: splashSparkBurst 0.65s ease-out 0.62s both;
+}
+
+.splash-shimmer {
+  animation: splashShimmerSweep 0.78s ease-in-out 0.72s both;
+}
+
+.splash-glow-pulse {
+  animation: splashGlowPulse 0.9s ease-out 0.1s both;
+}
+
+.splash-text-rise {
+  animation: splashTextRise 0.48s var(--ease-ios-spring) 0.58s both;
+}
+
+.splash-subtitle-rise {
+  animation: splashTextRise 0.48s var(--ease-ios-spring) 0.7s both;
+}
+
+/* =====================================================================
+   DYNAMIC ISLAND LIVE ACTIVITY + PAGE PUSH/POP + ZEN AMBIENT + FROSTED GLASS
+   ===================================================================== */
+
+@keyframes iosIslandPop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -20px, 0) scale(0.72);
+  }
+  65% {
+    opacity: 1;
+    transform: translate3d(0, 2px, 0) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes islandWaveBar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes iosViewPushIn {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes iosViewPopIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-16px, 0, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes zenOrbDriftA {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(38px, 26px, 0) scale(1.12);
+  }
+}
+
+@keyframes zenOrbDriftB {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-34px, -28px, 0) scale(1.09);
+  }
+}
+
+.ios-island-enter {
+  animation: iosIslandPop 0.44s var(--ease-ios-bounce) both;
+  will-change: transform, opacity;
+}
+
+.island-wave-bar {
+  transform-origin: bottom;
+  animation: islandWaveBar 0.85s ease-in-out infinite;
+}
+
+.ios-view-push {
+  animation: iosViewPushIn 0.34s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.ios-view-pop {
+  animation: iosViewPopIn 0.34s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.zen-orb-a {
+  animation: zenOrbDriftA 14s ease-in-out infinite;
+}
+
+.zen-orb-b {
+  animation: zenOrbDriftB 17s ease-in-out infinite;
+}
+
+/* Chế độ Kính Mờ + Hình nền cá nhân (Custom Wallpaper Frosted Glass) */
+[data-wallpaper-active='true'] body,
+[data-wallpaper-active='true'] #root {
+  background-color: transparent !important;
+}
+
+[data-wallpaper-active='true'] .glass-canvas {
+  background-color: transparent !important;
+}
+
+[data-wallpaper-active='true'] .ide-card,
+[data-wallpaper-active='true'] .glass-surface {
+  background-color: color-mix(in srgb, var(--bg-panel) var(--glass-opacity, 78%), transparent) !important;
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(160%);
+}
+
+[data-wallpaper-active='true'] .monaco-editor,
+[data-wallpaper-active='true'] .monaco-editor-background,
+[data-wallpaper-active='true'] .monaco-editor .margin {
+  background-color: transparent !important;
+}
+
+/* Hiệu ứng Con trỏ phát sáng & Vầng sáng dòng đang gõ */
+[data-glow-caret='on'] .monaco-editor .cursors-layer .cursor {
+  border-radius: 2px !important;
+  box-shadow:
+    0 0 12px var(--accent-primary),
+    0 0 5px var(--accent-secondary) !important;
+}
+
+[data-glow-caret='on'] .monaco-editor .view-overlays .current-line {
+  background: linear-gradient(
+    90deg,
+    var(--bg-active) 0%,
+    transparent 85%
+  ) !important;
+  box-shadow: inset 2px 0 0 var(--accent-primary) !important;
+}
+
+[data-glow-caret='off'] .monaco-editor .cursors-layer .cursor {
+  box-shadow: none !important;
+}
+
+/* =====================================================================
+   CIRCULAR THEME RIPPLE (VIEW TRANSITIONS API) + STAGGER + SPOTLIGHT + CONFETTI
+   ===================================================================== */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+@keyframes homeCascadeIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.975);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes homeBadgePop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.76);
+  }
+  68% {
+    opacity: 1;
+    transform: translate3d(0, -2px, 0) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes islandConfettiFly {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(0.4) rotate(0deg);
+  }
+  65% {
+    opacity: 1;
+    transform: translate3d(var(--cx, 0px), var(--cy, 24px), 0) scale(1) rotate(var(--cr, 140deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(
+        calc(var(--cx, 0px) * 1.35),
+        calc(var(--cy, 24px) + 28px),
+        0
+      )
+      scale(0.35)
+      rotate(calc(var(--cr, 140deg) * 1.6));
+  }
+}
+
+@keyframes ctaGlossSweep {
+  0%,
+  72% {
+    transform: translateX(-160%) skewX(-24deg);
+  }
+  100% {
+    transform: translateX(320%) skewX(-24deg);
+  }
+}
+
+.home-stagger {
+  animation: homeCascadeIn 0.44s var(--ease-ios-spring) both;
+  will-change: transform, opacity;
+}
+
+.home-badge-pop {
+  animation: homeBadgePop 0.46s var(--ease-ios-bounce) both;
+  will-change: transform, opacity;
+}
+
+.island-confetti-dot {
+  animation: islandConfettiFly 0.95s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.cta-gloss-sheen {
+  animation: ctaGlossSweep 4.8s ease-in-out infinite;
+}
+
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--spot-opacity, 0);
+  transition: opacity 0.28s ease;
+  background: radial-gradient(
+    240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgba(255, 255, 255, 0.085),
+    transparent 65%
+  );
+  border-radius: inherit;
+}
+
+[data-ui-theme='lavender-light'] .spotlight-card::after,
+[data-ui-theme='solarized-light'] .spotlight-card::after {
+  background: radial-gradient(
+    240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgba(59, 130, 246, 0.08),
+    transparent 65%
+  );
 }
 
 /* =====================================================================
@@ -244,12 +905,31 @@ body {
 }
 
 .monaco-editor .suggest-widget,
-.monaco-editor .parameter-hints-widget {
+.monaco-editor .parameter-hints-widget,
+.monaco-editor .monaco-hover {
   z-index: 9999 !important;
+  background-color: var(--bg-panel-alt) !important;
+  color: var(--text-primary) !important;
   border-radius: 12px !important;
-  border: none !important;
-  box-shadow: 0 14px 32px -8px rgba(0, 0, 0, 0.45) !important;
-  animation: suggestWidgetAppear 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  border: 1px solid var(--border-subtle) !important;
+  box-shadow: 0 18px 42px -10px rgba(0, 0, 0, 0.58) !important;
+  animation: suggestWidgetAppear 0.14s var(--ease-ios-out);
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+  background-color: var(--bg-active) !important;
+  color: var(--text-primary) !important;
+  border-radius: 7px !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .highlight {
+  color: var(--accent-secondary) !important;
+  font-weight: 700 !important;
+}
+
+.monaco-editor .suggest-widget .details-label,
+.monaco-editor .suggest-widget .type-label {
+  color: var(--text-secondary) !important;
 }
 
 .monaco-editor .bracket-match {
@@ -358,10 +1038,6 @@ body {
   background-color: var(--bg-active) !important;
 }
 
-.theme-scope [class*='border'] {
-  border-color: transparent !important;
-}
-
 .theme-scope [class*='text-[#CCCCCC]'],
 .theme-scope [class*='text-[#D4D4D4]'],
 .theme-scope [class*='text-[#E0E0E0]'],
@@ -418,11 +1094,20 @@ body {
 
 .theme-scope button {
   border-radius: 11px;
-  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, background-color 0.18s ease;
+  transition:
+    transform 0.22s var(--ease-ios-bounce),
+    box-shadow 0.2s var(--ease-ios-out),
+    background-color 0.2s ease;
 }
 
-.theme-scope button:hover:not(:disabled) {
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .theme-scope button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+.theme-scope button:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
 ::-webkit-scrollbar {
@@ -437,4 +1122,23 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--accent-glow);
   border-radius: 9999px;
+}
+
+/* iPadOS Pointer Magnetism Hover for Floating Dock */
+.ipad-dock-item {
+  transition:
+    transform 0.24s var(--ease-ios-bounce),
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.22s var(--ease-ios-out);
+}
+
+@media (hover: hover) {
+  .ipad-dock-item:hover {
+    transform: translateY(-3px) scale(1.14);
+  }
+}
+
+.ipad-dock-item:active {
+  transform: scale(0.92);
 }

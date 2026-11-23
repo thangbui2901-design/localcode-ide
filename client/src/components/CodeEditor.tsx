@@ -26,6 +26,7 @@ interface CodeEditorProps {
   onRun: () => void;
   onFocusEditor?: () => void;
   onCursorChange?: (line: number, column: number) => void;
+  onChangeFontSize?: (nextSize: number) => void;
   onQuickCreateTemplate?: (fileName: string, content: string) => void;
   onQuickCreateWebProject?: () => void;
 }
@@ -71,67 +72,6 @@ function ensureMonacoWebAndCppSupport() {
   } catch {
     // Bỏ qua nếu worker chưa sẵn sàng
   }
-
-  monaco.languages.registerCompletionItemProvider('cpp', {
-    provideCompletionItems: (model, position) => {
-      const word = model.getWordUntilPosition(position);
-      const range: monaco.IRange = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn
-      };
-
-      const snippets: Array<{ label: string; insertText: string; detail: string }> = [
-        {
-          label: 'cppmain',
-          detail: 'Khung chương trình C++ chuẩn',
-          insertText: [
-            '#include <iostream>',
-            'using namespace std;',
-            '',
-            'int main() {',
-            '    ios::sync_with_stdio(false);',
-            '    cin.tie(nullptr);',
-            '    ${1}',
-            '    return 0;',
-            '}'
-          ].join('\n')
-        },
-        {
-          label: 'bits',
-          detail: '#include <bits/stdc++.h>',
-          insertText: '#include <bits/stdc++.h>\nusing namespace std;\n'
-        },
-        {
-          label: 'fori',
-          detail: 'Vòng lặp for (int i = 0; i < n; ++i)',
-          insertText: 'for (int ${1:i} = 0; ${1:i} < ${2:n}; ++${1:i}) {\n    ${3}\n}'
-        },
-        {
-          label: 'cout',
-          detail: 'In ra màn hình với cout',
-          insertText: 'cout << ${1} << "\\n";'
-        },
-        {
-          label: 'cin',
-          detail: 'Nhập dữ liệu với cin',
-          insertText: 'cin >> ${1};'
-        }
-      ];
-
-      return {
-        suggestions: snippets.map((s) => ({
-          label: s.label,
-          kind: monaco.languages.CompletionItemKind.Snippet,
-          documentation: s.detail,
-          insertText: s.insertText,
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          range
-        }))
-      };
-    }
-  });
 }
 
 function mapToMonacoLanguage(lang: SupportedLanguage): string {
@@ -201,6 +141,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onRun,
   onFocusEditor,
   onCursorChange,
+  onChangeFontSize,
   onQuickCreateTemplate,
   onQuickCreateWebProject
 }) => {
@@ -209,6 +150,78 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const suppressChangeRef = useRef(false);
   const isAutoClosingTagRef = useRef(false);
   const [copiedSnippet, setCopiedSnippet] = useState<'html' | 'css' | null>(null);
+  const [zoomHudSize, setZoomHudSize] = useState<number | null>(null);
+  const pinchRef = useRef<{ startDist: number; startSize: number } | null>(null);
+  const zoomHudTimerRef = useRef<number | null>(null);
+
+  const triggerZoomHud = (nextSize: number) => {
+    setZoomHudSize(nextSize);
+    if (zoomHudTimerRef.current) window.clearTimeout(zoomHudTimerRef.current);
+    zoomHudTimerRef.current = window.setTimeout(() => setZoomHudSize(null), 750);
+  };
+
+  const handleTouchStartPinch = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && onChangeFontSize) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = {
+        startDist: Math.hypot(dx, dy),
+        startSize: settings.fontSize
+      };
+    }
+  };
+
+  const handleTouchMovePinch = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 2 || !pinchRef.current || !onChangeFontSize) return;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const ratio = dist / Math.max(20, pinchRef.current.startDist);
+    const nextSize = Math.max(11, Math.min(28, Math.round(pinchRef.current.startSize * ratio)));
+    if (nextSize !== settings.fontSize) {
+      onChangeFontSize(nextSize);
+      triggerZoomHud(nextSize);
+    }
+  };
+
+  const handleTouchEndPinch = () => {
+    pinchRef.current = null;
+  };
+
+  const applyVirtualKeyboardPolicy = (suppressSoftKeyboard: boolean, dismissIfFocused = false) => {
+    const dom = instanceRef.current?.getDomNode();
+    if (!dom) return;
+    const textareas = dom.querySelectorAll<HTMLTextAreaElement>('textarea.inputarea, textarea');
+    textareas.forEach((ta) => {
+      if (suppressSoftKeyboard) {
+        ta.setAttribute('inputmode', 'none');
+        ta.inputMode = 'none';
+        ta.setAttribute('virtualkeyboardpolicy', 'manual');
+        if (dismissIfFocused && document.activeElement === ta) {
+          ta.blur();
+          window.requestAnimationFrame(() => {
+            ta.focus({ preventScroll: true });
+          });
+        }
+      } else {
+        ta.removeAttribute('inputmode');
+        ta.removeAttribute('virtualkeyboardpolicy');
+      }
+    });
+  };
+
+  // Tự động đồng bộ chế độ Bàn phím rời (ẩn phím ảo iPad) lên textarea ẩn của Monaco
+  useEffect(() => {
+    const hide = Boolean(settings.hardwareKeyboardMode);
+    applyVirtualKeyboardPolicy(hide, hide);
+  }, [settings.hardwareKeyboardMode, file?.path]);
+
+  // Chạm bằng chuột / trackpad rời trên iPad tự động giữ ẩn bàn phím ảo;
+  // chạm ngón tay chỉ bật bàn phím ảo khi KHÔNG bật chế độ Bàn phím rời
+  const handleEditorPointerDownCapture = (e: React.PointerEvent<HTMLDivElement>) => {
+    const hide = Boolean(settings.hardwareKeyboardMode) || e.pointerType === 'mouse';
+    applyVirtualKeyboardPolicy(hide, false);
+  };
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -247,6 +260,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       minimap: { enabled: breakpoint === 'desktop' && settings.minimap },
       lineNumbers: settings.lineNumbers,
       automaticLayout: true,
+      fixedOverflowWidgets: true,
       scrollBeyondLastLine: false,
       smoothScrolling: true,
       cursorBlinking: 'smooth',
@@ -255,10 +269,28 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       quickSuggestions: settings.quickSuggestions
         ? { other: 'on', comments: 'off', strings: 'on' }
         : false,
+      quickSuggestionsDelay: 40,
       suggestOnTriggerCharacters: settings.suggestOnTriggerCharacters,
       acceptSuggestionOnEnter: 'on',
+      acceptSuggestionOnCommitCharacter: true,
       tabCompletion: 'on',
-      snippetSuggestions: 'top',
+      wordBasedSuggestions: 'currentDocument',
+      snippetSuggestions: 'inline',
+      parameterHints: { enabled: true, cycle: true },
+      suggest: {
+        preview: true,
+        filterGraceful: true,
+        snippetsPreventQuickSuggestions: false,
+        showIcons: true,
+        showStatusBar: true,
+        showKeywords: true,
+        showSnippets: true,
+        showFunctions: true,
+        showMethods: true,
+        showClasses: true,
+        showVariables: true,
+        showProperties: true
+      },
       linkedEditing: true,
       colorDecorators: true,
       defaultColorDecorators: true,
@@ -617,5 +649,31 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     );
   }
 
-  return <div ref={containerRef} className="flex-1 min-h-0 min-w-0 w-full h-full" />;
+  return (
+    <div
+      onPointerDownCapture={handleEditorPointerDownCapture}
+      onTouchStart={handleTouchStartPinch}
+      onTouchMove={handleTouchMovePinch}
+      onTouchEnd={handleTouchEndPinch}
+      onTouchCancel={handleTouchEndPinch}
+      className="flex-1 min-h-0 min-w-0 w-full h-full relative"
+    >
+      <div ref={containerRef} className="w-full h-full" />
+      {zoomHudSize !== null && (
+        <div
+          style={{
+            backgroundColor: 'var(--bg-panel)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)'
+          }}
+          className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 px-4 py-2 rounded-2xl backdrop-blur-xl shadow-2xl flex items-center gap-2 ios-popover-enter"
+        >
+          <span className="text-xs font-bold opacity-60">Aa</span>
+          <span className="font-mono text-base font-extrabold" style={{ color: 'var(--accent-primary)' }}>
+            {zoomHudSize}px
+          </span>
+        </div>
+      )}
+    </div>
+  );
 };

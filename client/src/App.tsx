@@ -23,7 +23,11 @@ import {
   Maximize2,
   Minimize2,
   Radio,
-  ImagePlus
+  ImagePlus,
+  Home,
+  Command,
+  ListTree,
+  ChevronRight
 } from 'lucide-react';
 import {
   CompilerSettings,
@@ -32,6 +36,8 @@ import {
   FileNode,
   IdeDiagnostic,
   SupportedLanguage,
+  TestCaseItem,
+  TestCaseResult,
   WorkspaceFile
 } from './types/ide';
 import { useViewport } from './hooks/useViewport';
@@ -42,6 +48,7 @@ import {
   exportIdbWorkspaceJson,
   importIdbWorkspaceJson,
   loadIdbWorkspace,
+  renameIdbEntry,
   saveIdbFile
 } from './services/indexedDbWorkspace';
 import { executeWithPiston, terminateCloudExecution } from './services/pistonRunner';
@@ -56,6 +63,29 @@ import { MobileNav, MobileTab } from './components/MobileNav';
 import { HeaderTimer } from './components/HeaderTimer';
 import { FloatingToast, ToastItem, ToastTone } from './components/FloatingToast';
 import { WebPreviewPane } from './components/WebPreviewPane';
+import { HomeScreen, NewProjectTemplate, QuickStartKind } from './components/HomeScreen';
+import { CommandPalette, PaletteCommand, PaletteIcons } from './components/CommandPalette';
+import { SplashScreen } from './components/SplashScreen';
+import { PencilScratchpad } from './components/ipad/PencilScratchpad';
+import { ProblemNotesPane } from './components/ipad/ProblemNotesPane';
+import { OutlinePanel, extractOutlineSymbols } from './components/ipad/OutlinePanel';
+import { DiffViewerModal } from './components/ipad/DiffViewerModal';
+import { VirtualTrackpad } from './components/ipad/VirtualTrackpad';
+import { KeyboardShortcutsHud } from './components/ipad/KeyboardShortcutsHud';
+import { DropZoneOverlay } from './components/ipad/DropZoneOverlay';
+import { IpadFloatingDock, IpadRightTool } from './components/ipad/IpadFloatingDock';
+import { downloadZipArchive } from './utils/zipExporter';
+import {
+  ACCENT_PRESETS,
+  VisualPreferences,
+  loadVisualPreferences,
+  resolveWallpaperStyle,
+  saveVisualPreferences
+} from './utils/visualPrefs';
+import {
+  ensurePointerOriginTracker,
+  runThemeRippleTransition
+} from './utils/themeTransition';
 
 export type UiThemeId =
   | 'midnight-indigo'
@@ -79,10 +109,10 @@ interface ThemeOption {
 const UI_THEMES: ThemeOption[] = [
   {
     id: 'midnight-indigo',
-    name: 'Midnight Indigo',
+    name: 'Midnight Navy',
     mode: 'dark',
-    bgSwatch: '#111022',
-    accentSwatch: '#7C5CFF',
+    bgSwatch: '#0D1326',
+    accentSwatch: '#3B82F6',
     monacoTheme: 'vs-dark-modern'
   },
   {
@@ -149,8 +179,9 @@ function applyEnhancedEditorBehavior(_editor: monaco.editor.ICodeEditor) {
   // Đã chuyển sang CodeEditor.tsx
 }
 
-function applyMonacoThemeForUi(themeId: UiThemeId) {
+function applyMonacoThemeForUi(themeId: UiThemeId, accentOverride?: string) {
   const themeMeta = UI_THEMES.find((t) => t.id === themeId) || UI_THEMES[0];
+  const accentHex = accentOverride || themeMeta.accentSwatch;
   getAllMonacoNamespaces().forEach((m) => {
     try {
       if (themeMeta.mode === 'dark') {
@@ -168,10 +199,10 @@ function applyMonacoThemeForUi(themeId: UiThemeId) {
             'editor.background': themeMeta.bgSwatch,
             'editor.foreground': '#ECEAF8',
             'editor.lineHighlightBackground': '#FFFFFF0B',
-            'editor.selectionBackground': `${themeMeta.accentSwatch}44`,
-            'editorCursor.foreground': themeMeta.accentSwatch,
+            'editor.selectionBackground': `${accentHex}44`,
+            'editorCursor.foreground': accentHex,
             'editorLineNumber.foreground': '#5C5F7A',
-            'editorLineNumber.activeForeground': themeMeta.accentSwatch
+            'editorLineNumber.activeForeground': accentHex
           }
         });
         m.editor.setTheme('vs-dark-modern');
@@ -190,10 +221,10 @@ function applyMonacoThemeForUi(themeId: UiThemeId) {
             'editor.background': themeMeta.bgSwatch,
             'editor.foreground': '#17162B',
             'editor.lineHighlightBackground': '#00000008',
-            'editor.selectionBackground': `${themeMeta.accentSwatch}28`,
-            'editorCursor.foreground': themeMeta.accentSwatch,
+            'editor.selectionBackground': `${accentHex}28`,
+            'editorCursor.foreground': accentHex,
             'editorLineNumber.foreground': '#9E9BB8',
-            'editorLineNumber.activeForeground': themeMeta.accentSwatch
+            'editorLineNumber.activeForeground': accentHex
           }
         });
         m.editor.setTheme('code-ide-light');
@@ -213,6 +244,7 @@ function detectLanguage(fileName: string): SupportedLanguage {
   if (lower.endsWith('.css')) return 'css';
   if (lower.endsWith('.js') || lower.endsWith('.mjs')) return 'javascript';
   if (lower.endsWith('.json')) return 'json';
+  if (/\.(txt|in|inp|out|csv|dat|log)$/i.test(lower)) return 'plaintext';
   if (/\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf)$/i.test(lower)) return 'asset';
   return 'cpp';
 }
@@ -286,8 +318,80 @@ export default function App() {
   });
 
   const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState<boolean>(true);
+  const [showHomeScreen, setShowHomeScreen] = useState<boolean>(true);
+  const [zenMode, setZenMode] = useState<boolean>(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [celebrateKey, setCelebrateKey] = useState(0);
+  const [visualPrefs, setVisualPrefs] = useState<VisualPreferences>(() => loadVisualPreferences());
+
+  useEffect(() => {
+    ensurePointerOriginTracker();
+  }, []);
+
+  const handleChangeUiTheme = useCallback((nextTheme: UiThemeId) => {
+    runThemeRippleTransition(() => {
+      document.documentElement.setAttribute('data-ui-theme', nextTheme);
+      setUiTheme(nextTheme);
+    });
+  }, []);
+  const [sheetDragY, setSheetDragY] = useState(0);
+  const sheetDragStartRef = useRef<number | null>(null);
+  const edgeSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleUpdateVisualPrefs = useCallback((patch: Partial<VisualPreferences>) => {
+    setVisualPrefs((prev) => {
+      const next = { ...prev, ...patch };
+      saveVisualPreferences(next);
+      return next;
+    });
+  }, []);
+
+  const activeAccentOverride = useMemo(() => {
+    if (visualPrefs.accentColor === 'auto') return undefined;
+    return ACCENT_PRESETS.find((a) => a.id === visualPrefs.accentColor);
+  }, [visualPrefs.accentColor]);
+
+  const wallpaperStyle = useMemo(() => resolveWallpaperStyle(visualPrefs), [visualPrefs]);
+  const [pinnedPaths, setPinnedPaths] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('codeide_pinned_paths');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+  const [testCasesByFile, setTestCasesByFile] = useState<Record<string, TestCaseItem[]>>(() => {
+    try {
+      const raw = localStorage.getItem('codeide_test_cases_v1');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [testResultsByFile, setTestResultsByFile] = useState<
+    Record<string, Record<string, TestCaseResult>>
+  >({});
+  const [isRunningTests, setIsRunningTests] = useState(false);
 
   const currentThemeObj = UI_THEMES.find((t) => t.id === uiTheme) || UI_THEMES[0];
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('codeide_pinned_paths', JSON.stringify(pinnedPaths));
+    } catch {
+      // Bỏ qua
+    }
+  }, [pinnedPaths]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('codeide_test_cases_v1', JSON.stringify(testCasesByFile));
+    } catch {
+      // Bỏ qua
+    }
+  }, [testCasesByFile]);
 
   useEffect(() => {
     localStorage.setItem('codeide_typing_sound', String(typingSound));
@@ -296,7 +400,7 @@ export default function App() {
   useEffect(() => {
     const syncAllMonaco = () => {
       ensureBuiltInIntelliSense();
-      applyMonacoThemeForUi(uiTheme);
+      applyMonacoThemeForUi(uiTheme, activeAccentOverride?.primary);
       getAllMonacoNamespaces().forEach((m) => {
         m.editor.getEditors().forEach((ed) => applyEnhancedEditorBehavior(ed));
       });
@@ -330,7 +434,28 @@ export default function App() {
       window.clearTimeout(stopPoll);
       disposables.forEach((d) => d.dispose());
     };
-  }, [uiTheme]);
+  }, [uiTheme, activeAccentOverride]);
+
+  // Đồng bộ Màu nhấn tự do, Con trỏ phát sáng & Chế độ Kính mờ lên <html>
+  useEffect(() => {
+    const root = document.documentElement;
+    if (activeAccentOverride) {
+      root.style.setProperty('--accent-primary', activeAccentOverride.primary);
+      root.style.setProperty('--accent-secondary', activeAccentOverride.secondary);
+      root.style.setProperty('--accent-glow', activeAccentOverride.glow);
+      root.style.setProperty('--bg-active', activeAccentOverride.activeBg);
+    } else {
+      root.style.removeProperty('--accent-primary');
+      root.style.removeProperty('--accent-secondary');
+      root.style.removeProperty('--accent-glow');
+      root.style.removeProperty('--bg-active');
+    }
+
+    root.setAttribute('data-glow-caret', visualPrefs.glowCaret ? 'on' : 'off');
+    root.setAttribute('data-wallpaper-active', wallpaperStyle ? 'true' : 'false');
+    root.style.setProperty('--glass-blur', `${visualPrefs.glassBlur}px`);
+    root.style.setProperty('--glass-opacity', `${visualPrefs.glassOpacity}%`);
+  }, [activeAccentOverride, visualPrefs, wallpaperStyle]);
 
   const [mode, setMode] = useState<ExecutionMode>('standalone');
   const [tree, setTree] = useState<FileNode[]>([]);
@@ -348,12 +473,45 @@ export default function App() {
 
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
   const [activeLineCount, setActiveLineCount] = useState<number>(1);
-  const [sidebarView, setSidebarView] = useState<'explorer' | 'search' | null>('explorer');
+  const [sidebarView, setSidebarView] = useState<'explorer' | 'search' | 'outline' | null>('explorer');
   const [bottomOpen, setBottomOpen] = useState(true);
   const [bottomHeight, setBottomHeight] = useState<number>(() => {
     const saved = Number(localStorage.getItem('codeide_bottom_height'));
     return saved >= 150 && saved <= 560 ? saved : 240;
   });
+
+  // ===== iPad Pro Exclusive Layout & Tool States =====
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('codeide_sidebar_width'));
+    return saved >= 195 && saved <= 420 ? saved : 256;
+  });
+  const [splitRatio, setSplitRatio] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('codeide_split_ratio'));
+    return saved >= 25 && saved <= 75 ? saved : 50;
+  });
+  const [consoleDock, setConsoleDock] = useState<'bottom' | 'right'>(() =>
+    localStorage.getItem('codeide_console_dock') === 'right' ? 'right' : 'bottom'
+  );
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('codeide_right_panel_width'));
+    return saved >= 280 && saved <= 680 ? saved : 390;
+  });
+  const [ipadRightTool, setIpadRightTool] = useState<IpadRightTool>(null);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [fileSnapshots, setFileSnapshots] = useState<Record<string, string>>({});
+  const [trackpadOpen, setTrackpadOpen] = useState(false);
+  const [shortcutsHudOpen, setShortcutsHudOpen] = useState(false);
+  const [shortcutsHudHoldMode, setShortcutsHudHoldMode] = useState(false);
+  const [isDragOverWorkspace, setIsDragOverWorkspace] = useState(false);
+  const [requestedConsoleTab, setRequestedConsoleTab] = useState<{
+    tab: 'terminal' | 'input' | 'tests' | 'problems';
+    seq: number;
+  } | null>(null);
+
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const dragDepthRef = useRef(0);
+  const cmdHoldTimerRef = useRef<number | null>(null);
+  const cmdComboUsedRef = useRef(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('editor');
@@ -361,7 +519,15 @@ export default function App() {
 
   const [logs, setLogs] = useState<TerminalChunk[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isWaitingForInput, setIsWaitingForInput] = useState(false);
   const [lastElapsedMs, setLastElapsedMs] = useState<number | null>(null);
+  const interactiveSessionRef = useRef<{
+    id: number;
+    activeFile: WorkspaceFile;
+    latestFiles: WorkspaceFile[];
+    accumulatedStdin: string;
+    printedStdout: string;
+  } | null>(null);
   const [diagnosticsMap, setDiagnosticsMap] = useState<Record<string, IdeDiagnostic[]>>({});
 
   const [stdinPreset, setStdinPreset] = useState<string>(() => localStorage.getItem('localcode_stdin') || '');
@@ -376,32 +542,116 @@ export default function App() {
   }, [bottomHeight]);
 
   useEffect(() => {
+    localStorage.setItem('codeide_sidebar_width', String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('codeide_split_ratio', String(splitRatio));
+  }, [splitRatio]);
+
+  useEffect(() => {
+    localStorage.setItem('codeide_console_dock', consoleDock);
+  }, [consoleDock]);
+
+  useEffect(() => {
+    localStorage.setItem('codeide_right_panel_width', String(rightPanelWidth));
+  }, [rightPanelWidth]);
+
+  useEffect(() => {
     ensureBuiltInIntelliSense();
     if (primaryEditorRef.current) applyEnhancedEditorBehavior(primaryEditorRef.current);
     if (secondaryEditorRef.current) applyEnhancedEditorBehavior(secondaryEditorRef.current);
   }, [breakpoint, splitOpen, livePreviewOpen, primaryPath, secondaryPath]);
 
-  const startResizeBottom = (e: React.MouseEvent) => {
+  const startResizeBottom = (e: React.PointerEvent) => {
     e.preventDefault();
     const startY = e.clientY;
     const startH = bottomHeight;
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
+    const onPointerMove = (moveEvent: PointerEvent) => {
       const delta = startY - moveEvent.clientY;
       const nextH = Math.min(560, Math.max(150, startH + delta));
       setBottomHeight(nextH);
     };
 
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
   };
 
-  const [editorSettings, setEditorSettings] = useState<EditorSettings>({
+  const startResizeSidebar = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const nextW = Math.min(420, Math.max(195, startW + (moveEvent.clientX - startX)));
+      setSidebarWidth(nextW);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  };
+
+  const startResizeRightPanel = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = rightPanelWidth;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const nextW = Math.min(680, Math.max(280, startW + (startX - moveEvent.clientX)));
+      setRightPanelWidth(nextW);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  };
+
+  const startResizeSplit = (e: React.PointerEvent, vertical: boolean) => {
+    e.preventDefault();
+    const container = splitContainerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const pct = vertical
+        ? ((moveEvent.clientY - rect.top) / Math.max(1, rect.height)) * 100
+        : ((moveEvent.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+      setSplitRatio(Math.min(75, Math.max(25, Math.round(pct * 10) / 10)));
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  };
+
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => ({
     fontSize: 14,
     fontFamily: 'JetBrains Mono',
     tabSize: 4,
@@ -412,8 +662,26 @@ export default function App() {
     formatOnSave: false,
     quickSuggestions: true,
     suggestOnTriggerCharacters: true,
+    hardwareKeyboardMode: localStorage.getItem('codeide_hw_keyboard_mode') === 'true',
     theme: currentThemeObj.monacoTheme
-  });
+  }));
+
+  useEffect(() => {
+    localStorage.setItem('codeide_hw_keyboard_mode', String(Boolean(editorSettings.hardwareKeyboardMode)));
+  }, [editorSettings.hardwareKeyboardMode]);
+
+  const handleToggleHardwareKeyboardMode = useCallback(() => {
+    setEditorSettings((prev) => {
+      const next = !prev.hardwareKeyboardMode;
+      showToast(
+        next
+          ? 'Đã bật chế độ Bàn phím rời (Ẩn bàn phím ảo iPad)'
+          : 'Đã tắt chế độ Bàn phím rời (Hiện lại phím ảo khi chạm)',
+        'info'
+      );
+      return { ...prev, hardwareKeyboardMode: next };
+    });
+  }, [showToast]);
 
   const [compilerSettings, setCompilerSettings] = useState<CompilerSettings>({
     cStandard: 'c11',
@@ -449,22 +717,28 @@ export default function App() {
   const cycleNextTheme = () => {
     const idx = UI_THEMES.findIndex((t) => t.id === uiTheme);
     const next = UI_THEMES[(idx + 1) % UI_THEMES.length];
-    setUiTheme(next.id);
+    handleChangeUiTheme(next.id);
     showToast(`Theme: ${next.name}`, 'info');
   };
 
-  const isFocusMode = !sidebarView && !bottomOpen;
-  const toggleFocusMode = () => {
-    if (isFocusMode) {
-      setSidebarView('explorer');
-      setBottomOpen(true);
-      showToast('Đã thoát chế độ Tập trung', 'info');
-    } else {
-      setSidebarView(null);
-      setBottomOpen(false);
-      showToast('Chế độ Tập trung (Zen Mode)', 'info');
-    }
-  };
+  const isFocusMode = zenMode;
+  const toggleFocusMode = useCallback(() => {
+    setZenMode((prev) => {
+      const next = !prev;
+      if (next) {
+        setSidebarView(null);
+        setBottomOpen(false);
+        showToast('Chế độ Tập trung (Zen Mode)', 'info');
+      } else {
+        if (breakpoint === 'desktop') {
+          setSidebarView('explorer');
+          setBottomOpen(true);
+        }
+        showToast('Đã thoát chế độ Tập trung', 'info');
+      }
+      return next;
+    });
+  }, [breakpoint, showToast]);
 
   const primaryFile = files.find((f) => f.path === primaryPath) || null;
   const secondaryFile = files.find((f) => f.path === secondaryPath) || null;
@@ -828,27 +1102,21 @@ export default function App() {
         ...f,
         content: f.path === currentFile.path ? liveContent : (liveContentMapRef.current[f.path] ?? f.content)
       }));
-      try {
-        await executeWithPiston(currentFile, latestFiles, compilerSettings, stdinPreset, {
-          onChunk: (type, text) => {
-            setLogs((prev) => [...prev, { type, text }]);
-          },
-          onFinish: (code, elapsedMs) => {
-            setIsRunning(false);
-            setLastElapsedMs(elapsedMs);
-            setLogs((prev) => [
-              ...prev,
-              { type: 'status', text: `\n[Hoàn thành với mã ${code} trong ${elapsedMs}ms]\n` }
-            ]);
-          }
-        });
-      } catch (err: any) {
-        setIsRunning(false);
-        setLogs((prev) => [
-          ...prev,
-          { type: 'stderr', text: `Lỗi thực thi Cloud: ${err?.message || 'Không xác định'}\n` }
-        ]);
-      }
+      const initialStdin = stdinPreset
+        ? stdinPreset.endsWith('\n')
+          ? stdinPreset
+          : `${stdinPreset}\n`
+        : '';
+      const session = {
+        id: Date.now(),
+        activeFile: { ...currentFile, content: liveContent },
+        latestFiles,
+        accumulatedStdin: initialStdin,
+        printedStdout: ''
+      };
+      interactiveSessionRef.current = session;
+      setIsWaitingForInput(false);
+      await runStandaloneInteractiveStep(session, false, false);
       return;
     }
 
@@ -882,6 +1150,7 @@ export default function App() {
           ...prev,
           { type: 'status', text: `\n[Tiến trình kết thúc với mã ${msg.code} trong ${msg.elapsedMs}ms]\n` }
         ]);
+        void loadWorkspaceForMode('local');
       } else {
         setLogs((prev) => [...prev, { type: msg.type, text: msg.text }]);
       }
@@ -926,16 +1195,147 @@ export default function App() {
     return () => window.removeEventListener('keydown', onGlobalKeyDown, { capture: true });
   }, []);
 
+  const runStandaloneInteractiveStep = async (
+    session: {
+      id: number;
+      activeFile: WorkspaceFile;
+      latestFiles: WorkspaceFile[];
+      accumulatedStdin: string;
+      printedStdout: string;
+    },
+    forceEof: boolean,
+    suppressHeader: boolean
+  ) => {
+    setIsRunning(true);
+    setIsWaitingForInput(false);
+    let stepStdout = '';
+    const stepStderr: string[] = [];
+
+    try {
+      await executeWithPiston(
+        session.activeFile,
+        session.latestFiles,
+        compilerSettings,
+        session.accumulatedStdin,
+        {
+          onChunk: (type, text) => {
+            if (interactiveSessionRef.current?.id !== session.id) return;
+            if (type === 'stdout') {
+              stepStdout += text;
+            } else if (type === 'stderr') {
+              stepStderr.push(text);
+            } else {
+              setLogs((prev) => [...prev, { type, text }]);
+            }
+          },
+          onSyncedFiles: async (syncedFiles) => {
+            if (!syncedFiles || syncedFiles.length === 0) return;
+            const activeDir = session.activeFile.path.includes('/')
+              ? session.activeFile.path.slice(0, session.activeFile.path.lastIndexOf('/'))
+              : '';
+            const savedNames: string[] = [];
+            for (const sf of syncedFiles) {
+              const targetPath = activeDir ? `${activeDir}/${sf.name}` : sf.name;
+              await saveIdbFile(targetPath, sf.content);
+              liveContentMapRef.current[targetPath] = sf.content;
+              savedNames.push(sf.name);
+            }
+            await loadWorkspaceForMode('standalone');
+            const summary =
+              savedNames.length === 1
+                ? `Đã đồng bộ tệp ${savedNames[0]} vào Workspace`
+                : `Đã đồng bộ ${savedNames.length} tệp (${savedNames.join(', ')}) vào Workspace`;
+            setLogs((prev) => [...prev, { type: 'status', text: `\n[Workspace] ${summary}\n` }]);
+            showToast(summary, 'success');
+          },
+          onFinish: (code, elapsedMs, waitingForInput) => {
+            if (interactiveSessionRef.current?.id !== session.id) return;
+            setIsRunning(false);
+            setLastElapsedMs(elapsedMs);
+
+            const prevOut = session.printedStdout;
+            const deltaStdout = stepStdout.startsWith(prevOut)
+              ? stepStdout.slice(prevOut.length)
+              : stepStdout.slice(Math.min(stepStdout.length, prevOut.length));
+            session.printedStdout = stepStdout;
+
+            const chunksToAdd: TerminalChunk[] = [];
+            if (deltaStdout) {
+              chunksToAdd.push({ type: 'stdout', text: deltaStdout });
+            }
+            if (stepStderr.length > 0) {
+              chunksToAdd.push({ type: 'stderr', text: stepStderr.join('') });
+            }
+
+            if (waitingForInput && !forceEof) {
+              setIsWaitingForInput(true);
+              if (chunksToAdd.length > 0) {
+                setLogs((prev) => [...prev, ...chunksToAdd]);
+              }
+            } else {
+              interactiveSessionRef.current = null;
+              setIsWaitingForInput(false);
+              chunksToAdd.push({
+                type: 'status',
+                text: `\n[Hoàn thành với mã ${code} trong ${elapsedMs}ms]\n`
+              });
+              setLogs((prev) => [...prev, ...chunksToAdd]);
+            }
+          }
+        },
+        {
+          interactive: !forceEof,
+          suppressHeader,
+          syncFiles: true
+        }
+      );
+    } catch (err: any) {
+      if (interactiveSessionRef.current?.id !== session.id) return;
+      interactiveSessionRef.current = null;
+      setIsRunning(false);
+      setIsWaitingForInput(false);
+      setLogs((prev) => [
+        ...prev,
+        { type: 'stderr', text: `Lỗi thực thi Cloud: ${err?.message || 'Không xác định'}\n` }
+      ]);
+    }
+  };
+
   const handleSendStdin = (line: string) => {
     setLogs((prev) => [...prev, { type: 'stdin', text: line }]);
+    if (mode === 'standalone') {
+      const session = interactiveSessionRef.current;
+      if (session) {
+        const normalized = line.endsWith('\n') ? line : `${line}\n`;
+        session.accumulatedStdin += normalized;
+        void runStandaloneInteractiveStep(session, false, true);
+      }
+      return;
+    }
     if (runWsRef.current?.readyState === WebSocket.OPEN) {
       runWsRef.current.send(JSON.stringify({ type: 'stdin', data: line }));
     }
   };
 
+  const handleSendEof = () => {
+    if (mode === 'standalone') {
+      const session = interactiveSessionRef.current;
+      if (session) {
+        setLogs((prev) => [...prev, { type: 'status', text: ' [EOF]\n' }]);
+        void runStandaloneInteractiveStep(session, true, true);
+      }
+      return;
+    }
+    runWsRef.current?.send(JSON.stringify({ type: 'eof' }));
+  };
+
   const handleKill = () => {
     if (mode === 'standalone') {
+      interactiveSessionRef.current = null;
+      setIsWaitingForInput(false);
+      setIsRunning(false);
       terminateCloudExecution();
+      setLogs((prev) => [...prev, { type: 'status', text: '\n[Đã dừng tiến trình]\n' }]);
     } else {
       runWsRef.current?.send(JSON.stringify({ type: 'kill' }));
     }
@@ -954,6 +1354,39 @@ export default function App() {
     editor.executeEdits('mobile-toolbar', [{ range: selection, text, forceMoveMarkers: true }]);
     editor.focus();
   };
+
+  const handleEditorUndo = () => {
+    const editor = activeEditorRef.current;
+    if (!editor) return;
+    editor.trigger('mobile-toolbar', 'undo', null);
+    editor.focus();
+  };
+
+  const handleEditorRedo = () => {
+    const editor = activeEditorRef.current;
+    if (!editor) return;
+    editor.trigger('mobile-toolbar', 'redo', null);
+    editor.focus();
+  };
+
+  const handleMoveCursor = (delta: -1 | 1) => {
+    const editor = activeEditorRef.current;
+    if (!editor) return;
+    editor.trigger('mobile-toolbar', delta < 0 ? 'cursorLeft' : 'cursorRight', null);
+    editor.focus();
+  };
+
+  const isTouchDevice =
+    typeof window !== 'undefined' &&
+    (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
+
+  const isNativeCapacitor =
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'capacitor:' ||
+      Boolean(
+        (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+          ?.isNativePlatform?.()
+      ));
 
   const handleUpdateCompiler = async (next: CompilerSettings) => {
     setCompilerSettings(next);
@@ -1282,56 +1715,1105 @@ export default function App() {
     if (secondaryPath === closedPath) setSecondaryPath(next[next.length - 1] || null);
   };
 
-  const mobileToolbarLang =
-    primaryFile?.language === 'python' ||
-    primaryFile?.language === 'c' ||
-    primaryFile?.language === 'cpp' ||
-    primaryFile?.language === 'markdown'
-      ? primaryFile.language
-      : 'cpp';
+  const mobileToolbarLang: SupportedLanguage = activeFile?.language || primaryFile?.language || 'cpp';
+
+  const handleQuickStartFromHome = async (kind: QuickStartKind) => {
+    const suffix = Date.now().toString().slice(-3);
+
+    if (kind === 'web-starter') {
+      await handleCreateWebStarterProject();
+      setShowHomeScreen(false);
+      setMobileTab('editor');
+      return;
+    }
+
+    const starterMap: Record<Exclude<QuickStartKind, 'web-starter'>, { name: string; content: string }> = {
+      python: {
+        name: `main_${suffix}.py`,
+        content: `# Python 3 – Code With You\ndef greet(name: str) -> str:\n    return f"Xin chào {name}! Chúc bạn code vui vẻ 🚀"\n\nif __name__ == "__main__":\n    print(greet("Coder"))\n`
+      },
+      javascript: {
+        name: `app_${suffix}.js`,
+        content: `// JavaScript ES2024 – Code With You\nconst skills = ["Python", "JavaScript", "C++", "HTML/CSS"];\nconsole.log("Bắt đầu hành trình lập trình:", skills.join(" • "));\n`
+      },
+      cpp: {
+        name: `main_${suffix}.cpp`,
+        content: `#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n\n    cout << "Xin chao tu C++!\\n";\n    return 0;\n}\n`
+      },
+      'cpp-oop': {
+        name: `oop_${suffix}.cpp`,
+        content: `#include <iostream>\n#include <string>\nusing namespace std;\n\nclass SinhVien {\nprivate:\n    string maSV;\n    string hoTen;\npublic:\n    SinhVien(string ma, string ten) : maSV(ma), hoTen(ten) {}\n    void xuat() const {\n        cout << maSV << " - " << hoTen << "\\n";\n    }\n};\n\nint main() {\n    SinhVien sv("SV01", "Nguyen Van A");\n    sv.xuat();\n    return 0;\n}\n`
+      },
+      c: {
+        name: `main_${suffix}.c`,
+        content: `#include <stdio.h>\n\nint main(void) {\n    printf("Xin chao tu C17!\\n");\n    return 0;\n}\n`
+      },
+      html: {
+        name: `index_${suffix}.html`,
+        content: `<!DOCTYPE html>\n<html lang="vi">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <title>Code With You</title>\n  <style>\n    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: grid; place-items: center; min-height: 100vh; margin: 0; }\n    .card { padding: 28px 36px; border-radius: 20px; background: rgba(255,255,255,0.06); text-align: center; }\n  </style>\n</head>\n<body>\n  <div class="card">\n    <h1>Xin chào từ HTML5 🚀</h1>\n    <p>Bấm nút Live / Run để xem trước trực tiếp.</p>\n  </div>\n</body>\n</html>\n`
+      },
+      css: {
+        name: `style_${suffix}.css`,
+        content: `/* CSS3 – Code With You */\n:root {\n  --primary: #3b82f6;\n  --surface: #111827;\n}\n\nbody {\n  margin: 0;\n  font-family: -apple-system, BlinkMacSystemFont, sans-serif;\n  background: var(--surface);\n  color: #f9fafb;\n}\n`
+      }
+    };
+
+    const chosen = starterMap[kind];
+    await handleCreateTemplateFile(chosen.name, chosen.content);
+    setShowHomeScreen(false);
+    setMobileTab('editor');
+  };
+
+  const handleCreateProjectFromHome = async (projectName: string, template: NewProjectTemplate) => {
+    await handleCreateFolder(projectName);
+
+    const projectFiles: Array<{ rel: string; content: string }> =
+      template === 'web'
+        ? [
+            {
+              rel: `${projectName}/index.html`,
+              content: `<!DOCTYPE html>\n<html lang="vi">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <title>${projectName}</title>\n  <link rel="stylesheet" href="./style.css" />\n</head>\n<body>\n  <main class="hero">\n    <h1>${projectName}</h1>\n    <p>Dự án Web tạo từ Code With You 🚀</p>\n    <button id="btn">Bấm thử</button>\n  </main>\n  <script src="./script.js"></script>\n</body>\n</html>\n`
+            },
+            {
+              rel: `${projectName}/style.css`,
+              content: `body {\n  margin: 0;\n  min-height: 100vh;\n  display: grid;\n  place-items: center;\n  background: #0b1120;\n  color: #f8fafc;\n  font-family: -apple-system, BlinkMacSystemFont, sans-serif;\n}\n.hero {\n  text-align: center;\n  padding: 32px;\n  border-radius: 24px;\n  background: rgba(59, 130, 246, 0.12);\n}\nbutton {\n  margin-top: 12px;\n  padding: 10px 20px;\n  border: none;\n  border-radius: 12px;\n  background: #3b82f6;\n  color: white;\n  font-weight: 600;\n}\n`
+            },
+            {
+              rel: `${projectName}/script.js`,
+              content: `document.getElementById('btn')?.addEventListener('click', () => {\n  console.log('${projectName} hoạt động tốt!');\n  alert('Xin chào từ ${projectName}!');\n});\n`
+            }
+          ]
+        : template === 'cpp-oop'
+          ? [
+              {
+                rel: `${projectName}/Model.h`,
+                content: `#pragma once\n#include <iostream>\n#include <string>\n\nclass AppItem {\npublic:\n    std::string title;\n    explicit AppItem(std::string t) : title(std::move(t)) {}\n    void print() const { std::cout << "[Item] " << title << "\\n"; }\n};\n`
+              },
+              {
+                rel: `${projectName}/main.cpp`,
+                content: `#include <iostream>\n#include "Model.h"\nusing namespace std;\n\nint main() {\n    AppItem item("${projectName}");\n    item.print();\n    return 0;\n}\n`
+              }
+            ]
+          : template === 'python'
+            ? [
+                {
+                  rel: `${projectName}/main.py`,
+                  content: `# Dự án ${projectName}\nprint("Khởi chạy ${projectName} thành công! 🚀")\n`
+                }
+              ]
+            : template === 'javascript'
+              ? [
+                  {
+                    rel: `${projectName}/index.js`,
+                    content: `// Dự án ${projectName}\nconsole.log("Khởi chạy ${projectName} thành công!");\n`
+                  }
+                ]
+              : [
+                  {
+                    rel: `${projectName}/main.cpp`,
+                    content: `#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    cout << "Hello ${projectName}!\\n";\n    return 0;\n}\n`
+                  }
+                ];
+
+    for (const pf of projectFiles) {
+      if (mode === 'local') {
+        await fetch('/api/files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: pf.rel, content: pf.content })
+        });
+      } else {
+        await saveIdbFile(pf.rel, pf.content);
+      }
+    }
+
+    const updated = await loadWorkspaceForMode(mode);
+    const entry =
+      updated.find((f) => f.path === projectFiles[0].rel) ||
+      updated.find((f) => f.path.startsWith(`${projectName}/`));
+
+    if (entry) {
+      openFileInActivePane(entry);
+    }
+    setShowHomeScreen(false);
+    setMobileTab('editor');
+    showToast(`Đã tạo dự án "${projectName}"`, 'success');
+  };
+
+  const handleTogglePin = (targetPath: string) => {
+    setPinnedPaths((prev) => {
+      const exists = prev.includes(targetPath);
+      const next = exists ? prev.filter((p) => p !== targetPath) : [targetPath, ...prev];
+      showToast(exists ? `Đã bỏ ghim "${targetPath}"` : `Đã ghim "${targetPath}" lên đầu`, 'info');
+      return next;
+    });
+  };
+
+  const handleRenameEntry = async (oldPath: string, newPath: string) => {
+    const cleanOld = oldPath.replace(/^\/+|\/+$/g, '');
+    const cleanNew = newPath.replace(/^\/+|\/+$/g, '');
+    if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
+
+    flushLiveContent();
+
+    if (mode === 'local') {
+      const affected = files.filter(
+        (f) => f.path === cleanOld || f.path.startsWith(`${cleanOld}/`)
+      );
+      for (const f of affected) {
+        const nextPath = f.path === cleanOld ? cleanNew : `${cleanNew}${f.path.slice(cleanOld.length)}`;
+        await fetch('/api/files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: nextPath, content: f.content })
+        });
+      }
+      await fetch('/api/entry', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: cleanOld })
+      });
+    } else {
+      await renameIdbEntry(cleanOld, cleanNew);
+    }
+
+    const remapPath = (p: string) =>
+      p === cleanOld ? cleanNew : p.startsWith(`${cleanOld}/`) ? `${cleanNew}${p.slice(cleanOld.length)}` : p;
+
+    setOpenTabPaths((prev) => prev.map(remapPath));
+    setPrimaryPath((prev) => (prev ? remapPath(prev) : prev));
+    setSecondaryPath((prev) => (prev ? remapPath(prev) : prev));
+    setPinnedPaths((prev) => prev.map(remapPath));
+
+    await loadWorkspaceForMode(mode);
+    showToast(`Đã đổi tên thành "${cleanNew.split('/').pop()}"`, 'success');
+  };
+
+  const handleExportProjectZip = (targetPath: string, isFolder: boolean) => {
+    flushLiveContent();
+    const targetFiles = isFolder
+      ? liveFiles.filter((f) => f.path.startsWith(`${targetPath}/`))
+      : liveFiles.filter((f) => f.path === targetPath);
+
+    if (targetFiles.length === 0) {
+      showToast('Thư mục trống, không có tệp để nén ZIP', 'info');
+      return;
+    }
+
+    const entries = targetFiles.map((f) => ({
+      path: isFolder ? f.path.slice(targetPath.length + 1) : f.name,
+      content: f.content
+    }));
+    const zipBase = targetPath.split('/').pop() || 'project';
+    downloadZipArchive(`${zipBase}.zip`, entries);
+    showToast(`Đã xuất ${zipBase}.zip (${entries.length} tệp)`, 'success');
+  };
+
+  const handleImportCodeFiles = async (fileList: FileList) => {
+    flushLiveContent();
+    const importedPaths: string[] = [];
+
+    for (const file of Array.from(fileList)) {
+      const safeName = file.name.replace(/[\\/:*?"<>|]+/g, '_');
+      const isBinary = /\.(png|jpe?g|gif|webp|ico|bmp|woff2?|ttf|otf)$/i.test(safeName);
+
+      const content = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ''));
+        reader.onerror = () => reject(reader.error);
+        if (isBinary) {
+          reader.readAsDataURL(file);
+        } else {
+          reader.readAsText(file);
+        }
+      });
+
+      if (mode === 'local') {
+        await fetch('/api/files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: safeName, content })
+        });
+      } else {
+        await saveIdbFile(safeName, content);
+      }
+      importedPaths.push(safeName);
+    }
+
+    const updated = await loadWorkspaceForMode(mode);
+    const firstImported = updated.find((f) => f.path === importedPaths[0]);
+    if (firstImported) {
+      openFileInActivePane(firstImported);
+      setShowHomeScreen(false);
+      setMobileTab('editor');
+    }
+    showToast(`Đã nhập ${importedPaths.length} tệp vào Workspace`, 'success');
+  };
+
+  const activeTestKey = activeFile?.path || '__global__';
+  const activeTestCases = testCasesByFile[activeTestKey] || [];
+  const activeTestResults = testResultsByFile[activeTestKey] || {};
+
+  const handleChangeActiveTestCases = (next: TestCaseItem[]) => {
+    setTestCasesByFile((prev) => ({ ...prev, [activeTestKey]: next }));
+  };
+
+  const normalizeJudgeOutput = (text: string) =>
+    text
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .join('\n')
+      .trim();
+
+  const executeSingleTestCase = async (tc: TestCaseItem): Promise<TestCaseResult> => {
+    const fileToRun = activeFile;
+    if (!fileToRun) {
+      return { id: tc.id, status: 'err', actualOutput: '', stderr: 'Chưa mở tệp mã nguồn.' };
+    }
+    if (fileToRun.language !== 'cpp' && fileToRun.language !== 'c' && fileToRun.language !== 'python') {
+      return {
+        id: tc.id,
+        status: 'err',
+        actualOutput: '',
+        stderr: 'Bộ chấm Test Case hỗ trợ C, C++ và Python.'
+      };
+    }
+
+    flushLiveContent();
+    const latestSnap = liveFiles.map((f) => ({
+      ...f,
+      content: liveContentMapRef.current[f.path] ?? f.content
+    }));
+    const currentFile = latestSnap.find((f) => f.path === fileToRun.path) || fileToRun;
+
+    setTestResultsByFile((prev) => ({
+      ...prev,
+      [activeTestKey]: {
+        ...(prev[activeTestKey] || {}),
+        [tc.id]: { id: tc.id, status: 'running', actualOutput: '' }
+      }
+    }));
+
+    let stdoutBuf = '';
+    let stderrBuf = '';
+    let exitCode = 0;
+    let elapsedMs = 0;
+
+    await executeWithPiston(currentFile, latestSnap, compilerSettings, tc.input, {
+      onChunk: (type, text) => {
+        if (type === 'stdout') stdoutBuf += text;
+        if (type === 'stderr') stderrBuf += text;
+      },
+      onFinish: (code, ms) => {
+        exitCode = code;
+        elapsedMs = ms;
+      }
+    });
+
+    const normActual = normalizeJudgeOutput(stdoutBuf);
+    const normExpected = normalizeJudgeOutput(tc.expectedOutput);
+    const hasExpected = normExpected.length > 0;
+    const status: TestCaseResult['status'] =
+      exitCode !== 0 ? 'err' : !hasExpected || normActual === normExpected ? 'ac' : 'wa';
+
+    const result: TestCaseResult = {
+      id: tc.id,
+      status,
+      actualOutput: stdoutBuf.trimEnd(),
+      stderr: stderrBuf.trim() || undefined,
+      elapsedMs
+    };
+
+    setTestResultsByFile((prev) => ({
+      ...prev,
+      [activeTestKey]: {
+        ...(prev[activeTestKey] || {}),
+        [tc.id]: result
+      }
+    }));
+    return result;
+  };
+
+  const handleRunSingleTest = async (tc: TestCaseItem) => {
+    if (isRunningTests) return;
+    setIsRunningTests(true);
+    try {
+      const res = await executeSingleTestCase(tc);
+      showToast(
+        res.status === 'ac'
+          ? `${tc.name}: AC (${res.elapsedMs}ms)`
+          : res.status === 'wa'
+            ? `${tc.name}: Wrong Answer`
+            : `${tc.name}: Lỗi thực thi`,
+        res.status === 'ac' ? 'success' : 'error'
+      );
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
+  const handleRunAllTests = async () => {
+    if (isRunningTests || activeTestCases.length === 0) return;
+    setIsRunningTests(true);
+    let passed = 0;
+    try {
+      for (const tc of activeTestCases) {
+        const res = await executeSingleTestCase(tc);
+        if (res.status === 'ac') passed++;
+      }
+      const allPassed = passed === activeTestCases.length && activeTestCases.length > 0;
+      if (allPassed) {
+        setCelebrateKey((k) => k + 1);
+      }
+      showToast(
+        allPassed
+          ? `All Passed! (${passed}/${activeTestCases.length} AC)`
+          : `Hoàn tất chấm bài: ${passed}/${activeTestCases.length} AC`,
+        allPassed ? 'success' : 'info'
+      );
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
+  // Tự động lưu mốc gốc (snapshot) lần đầu mở từng tệp để Diff View luôn sẵn sàng
+  useEffect(() => {
+    if (!activeFile || activeFile.language === 'asset') return;
+    setFileSnapshots((prev) => {
+      if (prev[activeFile.path] !== undefined) return prev;
+      return { ...prev, [activeFile.path]: activeFile.content };
+    });
+  }, [activeFile?.path]);
+
+  const handleSaveDiffSnapshot = useCallback(
+    (file: WorkspaceFile) => {
+      const current = liveContentMapRef.current[file.path] ?? file.content;
+      setFileSnapshots((prev) => ({ ...prev, [file.path]: current }));
+      showToast(`Đã chụp mốc so sánh cho ${file.name}`, 'success');
+    },
+    [showToast]
+  );
+
+  const handleToggleConsoleDock = useCallback(() => {
+    setIpadRightTool(null);
+    setBottomOpen(true);
+    setConsoleDock((prev) => {
+      const next = prev === 'bottom' ? 'right' : 'bottom';
+      showToast(next === 'right' ? 'Console gắn sang Bên phải' : 'Console gắn xuống Dưới đáy', 'info');
+      return next;
+    });
+  }, [showToast]);
+
+  const handleToggleRightTool = useCallback((tool: Exclude<IpadRightTool, null>) => {
+    setShowHomeScreen(false);
+    setIpadRightTool((prev) => (prev === tool ? null : tool));
+  }, []);
+
+  const handleSendSampleToTests = useCallback(
+    (input: string, expectedOutput: string, name?: string) => {
+      const nextIdx = activeTestCases.length + 1;
+      const newTc: TestCaseItem = {
+        id: `tc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        name: name || `Sample #${nextIdx}`,
+        input,
+        expectedOutput
+      };
+      setTestCasesByFile((prev) => ({
+        ...prev,
+        [activeTestKey]: [...(prev[activeTestKey] || []), newTc]
+      }));
+      setBottomOpen(true);
+      setRequestedConsoleTab({ tab: 'tests', seq: Date.now() });
+      showToast(`Đã thêm "${newTc.name}" vào tab Tests`, 'success');
+    },
+    [activeTestCases.length, activeTestKey, showToast]
+  );
+
+  // ===== iPad Virtual Trackpad Handlers =====
+  const handleTrackpadMove = useCallback((dx: number, dy: number, select: boolean) => {
+    const ed = activeEditorRef.current;
+    if (!ed) return;
+    const model = ed.getModel();
+    const sel = ed.getSelection();
+    if (!model || !sel) return;
+
+    const lineCount = model.getLineCount();
+    const curLine = sel.positionLineNumber;
+    const curCol = sel.positionColumn;
+
+    const nextLine = Math.max(1, Math.min(lineCount, curLine + dy));
+    const maxCol = model.getLineMaxColumn(nextLine);
+    const nextCol = Math.max(1, Math.min(maxCol, curCol + dx));
+
+    if (select) {
+      ed.setSelection({
+        selectionStartLineNumber: sel.selectionStartLineNumber,
+        selectionStartColumn: sel.selectionStartColumn,
+        positionLineNumber: nextLine,
+        positionColumn: nextCol
+      });
+    } else {
+      ed.setPosition({ lineNumber: nextLine, column: nextCol });
+    }
+    ed.revealPosition({ lineNumber: nextLine, column: nextCol });
+  }, []);
+
+  const handleTrackpadSelectLine = useCallback(() => {
+    const ed = activeEditorRef.current;
+    if (!ed) return;
+    const model = ed.getModel();
+    const pos = ed.getPosition();
+    if (!model || !pos) return;
+    ed.setSelection({
+      startLineNumber: pos.lineNumber,
+      startColumn: 1,
+      endLineNumber: pos.lineNumber,
+      endColumn: model.getLineMaxColumn(pos.lineNumber)
+    });
+    ed.focus();
+  }, []);
+
+  const handleTrackpadSelectBlock = useCallback(() => {
+    const ed = activeEditorRef.current;
+    if (!ed) return;
+    const model = ed.getModel();
+    const pos = ed.getPosition();
+    if (!model || !pos) return;
+    const text = model.getValue();
+    const offset = model.getOffsetAt(pos);
+
+    let depth = 0;
+    let openIdx = -1;
+    for (let i = offset; i >= 0; i--) {
+      if (text[i] === '}' && i !== offset) depth++;
+      else if (text[i] === '{') {
+        if (depth === 0) {
+          openIdx = i;
+          break;
+        }
+        depth--;
+      }
+    }
+
+    if (openIdx !== -1) {
+      let closeDepth = 0;
+      let closeIdx = -1;
+      for (let i = openIdx; i < text.length; i++) {
+        if (text[i] === '{') closeDepth++;
+        else if (text[i] === '}') {
+          closeDepth--;
+          if (closeDepth === 0) {
+            closeIdx = i + 1;
+            break;
+          }
+        }
+      }
+      if (closeIdx !== -1) {
+        const startPos = model.getPositionAt(openIdx);
+        const endPos = model.getPositionAt(closeIdx);
+        ed.setSelection({
+          startLineNumber: startPos.lineNumber,
+          startColumn: startPos.column,
+          endLineNumber: endPos.lineNumber,
+          endColumn: endPos.column
+        });
+        ed.revealRangeInCenter({
+          startLineNumber: startPos.lineNumber,
+          startColumn: startPos.column,
+          endLineNumber: endPos.lineNumber,
+          endColumn: endPos.column
+        });
+        ed.focus();
+        return;
+      }
+    }
+    handleTrackpadSelectLine();
+  }, [handleTrackpadSelectLine]);
+
+  const handleTrackpadJumpEdge = useCallback((edge: 'start' | 'end') => {
+    const ed = activeEditorRef.current;
+    if (!ed) return;
+    const model = ed.getModel();
+    const pos = ed.getPosition();
+    if (!model || !pos) return;
+    const col =
+      edge === 'start'
+        ? Math.max(1, model.getLineFirstNonWhitespaceColumn(pos.lineNumber) || 1)
+        : model.getLineMaxColumn(pos.lineNumber);
+    ed.setPosition({ lineNumber: pos.lineNumber, column: col });
+    ed.revealPosition({ lineNumber: pos.lineNumber, column: col });
+    ed.focus();
+  }, []);
+
+  // ===== iPadOS Split View Drag & Drop Files / Code Snippets =====
+  const handleWorkspaceDragEnter = (e: React.DragEvent) => {
+    if (e.dataTransfer?.types?.includes('Files') || e.dataTransfer?.types?.includes('text/plain')) {
+      e.preventDefault();
+      dragDepthRef.current += 1;
+      setIsDragOverWorkspace(true);
+    }
+  };
+
+  const handleWorkspaceDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer?.types?.includes('Files') || e.dataTransfer?.types?.includes('text/plain')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleWorkspaceDragLeave = () => {
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragOverWorkspace(false);
+    }
+  };
+
+  const handleWorkspaceDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOverWorkspace(false);
+
+    const droppedFiles = e.dataTransfer?.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      const assetFiles: File[] = [];
+      const codeFiles: File[] = [];
+      Array.from(droppedFiles).forEach((f) => {
+        if (/\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf)$/i.test(f.name)) {
+          assetFiles.push(f);
+        } else {
+          codeFiles.push(f);
+        }
+      });
+
+      if (codeFiles.length > 0) {
+        const dt = new DataTransfer();
+        codeFiles.forEach((f) => dt.items.add(f));
+        await handleImportCodeFiles(dt.files);
+      }
+      if (assetFiles.length > 0) {
+        const dt = new DataTransfer();
+        assetFiles.forEach((f) => dt.items.add(f));
+        await handleImportAssets(dt.files);
+      }
+      return;
+    }
+
+    const droppedText = e.dataTransfer?.getData('text/plain');
+    if (droppedText && droppedText.trim().length > 0) {
+      const trimmed = droppedText.trim();
+      const ext = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')
+        ? 'html'
+        : trimmed.includes('#include') || trimmed.includes('int main')
+          ? 'cpp'
+          : trimmed.includes('def ') || trimmed.includes('print(')
+            ? 'py'
+            : 'js';
+      const fileName = `dropped_${Math.floor(Math.random() * 900 + 100)}.${ext}`;
+      await handleCreateTemplateFile(fileName, droppedText);
+      showToast(`Đã tạo tệp ${fileName} từ đoạn code kéo thả`, 'success');
+    }
+  };
+
+  // Phím tắt bàn phím rời iPad (Magic Keyboard / Bluetooth) & Hold ⌘ Cheat Sheet HUD
+  useEffect(() => {
+    const clearCmdTimer = () => {
+      if (cmdHoldTimerRef.current) {
+        window.clearTimeout(cmdHoldTimerRef.current);
+        cmdHoldTimerRef.current = null;
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Nhấn giữ phím ⌘ (hoặc Alt trên Windows) 550ms để hiện bảng phím tắt iPadOS
+      if ((e.key === 'Meta' || e.key === 'Alt') && !e.repeat) {
+        cmdComboUsedRef.current = false;
+        clearCmdTimer();
+        cmdHoldTimerRef.current = window.setTimeout(() => {
+          if (!cmdComboUsedRef.current && !showHomeScreen && breakpoint !== 'mobile') {
+            setShortcutsHudHoldMode(true);
+            setShortcutsHudOpen(true);
+          }
+        }, 550);
+        return;
+      }
+
+      if (e.metaKey || e.altKey || e.ctrlKey) {
+        cmdComboUsedRef.current = true;
+        clearCmdTimer();
+      }
+
+      if (e.key === 'Escape') {
+        if (shortcutsHudOpen) {
+          setShortcutsHudOpen(false);
+          setShortcutsHudHoldMode(false);
+          return;
+        }
+        if (diffOpen) {
+          setDiffOpen(false);
+          return;
+        }
+        if (zenMode && !commandPaletteOpen && !settingsOpen) {
+          setZenMode(false);
+          showToast('Đã thoát chế độ Tập trung', 'info');
+          return;
+        }
+      }
+
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      const key = e.key.toLowerCase();
+      if (key === 'p' && !e.shiftKey) {
+        e.preventDefault();
+        setCommandPaletteOpen((v) => !v);
+      } else if (key === 'b' && !e.shiftKey) {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        setSidebarView((prev) => (prev ? null : 'explorer'));
+      } else if (key === 'j' && e.altKey) {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        handleToggleConsoleDock();
+      } else if (key === 'j' && !e.shiftKey) {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        setBottomOpen((v) => !v);
+      } else if (e.key === '\\') {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        handleToggleSplit();
+      } else if (key === 'f' && e.shiftKey) {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        setSidebarView('search');
+      } else if (key === 'o' && e.shiftKey) {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        setSidebarView('outline');
+      } else if (key === 'd' && e.shiftKey) {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        setDiffOpen((v) => !v);
+      } else if (key === 'a' && e.shiftKey) {
+        e.preventDefault();
+        handleToggleRightTool('scratchpad');
+      } else if (key === 'n' && e.shiftKey) {
+        e.preventDefault();
+        handleToggleRightTool('notes');
+      } else if (key === 'k' && !e.shiftKey) {
+        e.preventDefault();
+        setLogs([]);
+        setLastElapsedMs(null);
+        showToast('Đã xóa Console', 'info');
+      } else if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        setEditorSettings((prev) => {
+          const next = Math.min(28, prev.fontSize + 1);
+          showToast(`Cỡ chữ Editor: ${next}px`, 'info');
+          return { ...prev, fontSize: next };
+        });
+      } else if (e.key === '-') {
+        e.preventDefault();
+        setEditorSettings((prev) => {
+          const next = Math.max(11, prev.fontSize - 1);
+          showToast(`Cỡ chữ Editor: ${next}px`, 'info');
+          return { ...prev, fontSize: next };
+        });
+      } else if (e.key === '0') {
+        e.preventDefault();
+        setEditorSettings((prev) => ({ ...prev, fontSize: 14 }));
+        showToast('Cỡ chữ mặc định: 14px', 'info');
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Meta' || e.key === 'Alt') {
+        clearCmdTimer();
+        setShortcutsHudOpen((open) => (shortcutsHudHoldMode ? false : open));
+        setShortcutsHudHoldMode(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', clearCmdTimer);
+    return () => {
+      clearCmdTimer();
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', clearCmdTimer);
+    };
+  }, [
+    handleToggleSplit,
+    handleToggleConsoleDock,
+    handleToggleRightTool,
+    showToast,
+    zenMode,
+    commandPaletteOpen,
+    settingsOpen,
+    diffOpen,
+    shortcutsHudOpen,
+    shortcutsHudHoldMode,
+    showHomeScreen,
+    breakpoint
+  ]);
+
+  const activeBreadcrumbSymbol = useMemo(() => {
+    if (!activeFile || activeFile.language === 'asset') return null;
+    const live = liveContentMapRef.current[activeFile.path] ?? activeFile.content;
+    const syms = extractOutlineSymbols(live, activeFile.language);
+    let best: { name: string; line: number } | null = null;
+    for (const s of syms) {
+      if (s.line <= cursor.line) best = { name: s.name, line: s.line };
+    }
+    return best;
+  }, [activeFile?.path, activeFile?.content, activeFile?.language, cursor.line]);
+
+  // Cử chỉ vuốt cạnh trái để mở Sidebar & vuốt xuống để đóng Terminal Sheet
+  const handleEdgeTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (touch && touch.clientX <= 28) {
+      edgeSwipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+    } else {
+      edgeSwipeStartRef.current = null;
+    }
+  };
+
+  const handleEdgeTouchEnd = (e: React.TouchEvent) => {
+    const start = edgeSwipeStartRef.current;
+    edgeSwipeStartRef.current = null;
+    if (!start) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = Math.abs(touch.clientY - start.y);
+    if (dx > 55 && dy < 52) {
+      if (breakpoint === 'mobile') {
+        setMobileTab('files');
+      } else {
+        setSidebarView('explorer');
+      }
+    }
+  };
+
+  const handleTerminalSheetDragStart = (e: React.PointerEvent) => {
+    sheetDragStartRef.current = e.clientY;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleTerminalSheetDragMove = (e: React.PointerEvent) => {
+    if (sheetDragStartRef.current === null) return;
+    setSheetDragY(Math.max(0, e.clientY - sheetDragStartRef.current));
+  };
+
+  const handleTerminalSheetDragEnd = (closeFn: () => void) => {
+    if (sheetDragStartRef.current === null) return;
+    const pulled = sheetDragY;
+    sheetDragStartRef.current = null;
+    setSheetDragY(0);
+    if (pulled > 85) {
+      closeFn();
+    }
+  };
+
+  const runningIslandLabel = isRunningTests
+    ? 'Đang chấm Test Cases...'
+    : `Đang chạy ${activeFile?.name || 'mã nguồn'}...`;
+
+  const renderWallpaperBackdrop = wallpaperStyle ? (
+    <div
+      aria-hidden="true"
+      style={wallpaperStyle}
+      className="fixed inset-0 z-0 pointer-events-none transition-all duration-500"
+    />
+  ) : null;
+
+  const paletteCommands: PaletteCommand[] = [
+    {
+      id: 'go-home',
+      title: 'Về Trang chủ (Home)',
+      subtitle: 'Mở màn hình chào mừng & danh sách dự án',
+      icon: <PaletteIcons.Home size={15} className="text-sky-400" />,
+      action: () => setShowHomeScreen(true)
+    },
+    {
+      id: 'run-code',
+      title: isWebLanguage(activeFile?.language) ? 'Bật Live Server Preview' : 'Chạy mã nguồn (Run)',
+      subtitle: 'Biên dịch & thực thi tệp hiện tại',
+      shortcut: '⌘Enter',
+      icon: <PaletteIcons.Play size={15} className="text-emerald-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        handleRun();
+      }
+    },
+    {
+      id: 'new-file',
+      title: 'Tạo tệp mới nhanh',
+      subtitle: 'Thêm tệp mới vào Workspace',
+      icon: <PaletteIcons.FilePlus size={15} className="text-violet-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        handleQuickNewFile();
+      }
+    },
+    {
+      id: 'format-code',
+      title: 'Định dạng mã nguồn (Format)',
+      subtitle: 'Căn chỉnh code gọn đẹp',
+      icon: <PaletteIcons.Wand2 size={15} className="text-amber-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        handleFormat();
+      }
+    },
+    {
+      id: 'toggle-split',
+      title: splitOpen ? 'Tắt chế độ Split View' : 'Bật chế độ Split View (2 khung)',
+      subtitle: 'Chia đôi màn hình so sánh 2 tệp',
+      shortcut: '⌘\\',
+      icon: <PaletteIcons.Columns size={15} className="text-sky-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        handleToggleSplit();
+      }
+    },
+    {
+      id: 'toggle-sidebar',
+      title: 'Ẩn / Hiện thanh thư mục (Explorer)',
+      shortcut: '⌘B',
+      icon: <PaletteIcons.PanelLeft size={15} className="text-sky-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        setSidebarView((prev) => (prev ? null : 'explorer'));
+      }
+    },
+    {
+      id: 'search-workspace',
+      title: 'Tìm kiếm toàn dự án (Search)',
+      shortcut: '⌘⇧F',
+      icon: <PaletteIcons.Search size={15} className="text-emerald-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        setSidebarView('search');
+      }
+    },
+    {
+      id: 'toggle-terminal',
+      title: 'Ẩn / Hiện Terminal & Test Cases',
+      shortcut: '⌘J',
+      icon: <PaletteIcons.PanelBottom size={15} className="text-emerald-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        setBottomOpen((v) => !v);
+      }
+    },
+    {
+      id: 'zen-mode',
+      title: isFocusMode ? 'Thoát chế độ Tập trung (Zen Mode)' : 'Bật chế độ Tập trung (Zen Mode)',
+      icon: <PaletteIcons.Maximize2 size={15} className="text-violet-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        toggleFocusMode();
+      }
+    },
+    {
+      id: 'cycle-theme',
+      title: 'Đổi chủ đề màu sắc (Theme)',
+      subtitle: `Đang dùng: ${currentThemeObj.name}`,
+      icon: <PaletteIcons.Palette size={15} className="text-pink-400" />,
+      action: cycleNextTheme
+    },
+    {
+      id: 'clear-console',
+      title: 'Xóa lịch sử Console',
+      shortcut: '⌘K',
+      icon: <PaletteIcons.Trash2 size={15} className="text-rose-400" />,
+      action: () => {
+        setLogs([]);
+        setLastElapsedMs(null);
+        showToast('Đã xóa Console', 'info');
+      }
+    },
+    {
+      id: 'open-settings',
+      title: 'Mở Cài đặt Code With You',
+      icon: <PaletteIcons.Settings size={15} className="text-zinc-400" />,
+      action: () => {
+        if (breakpoint === 'mobile' && !showHomeScreen) {
+          setMobileTab('settings');
+        } else {
+          setSettingsOpen(true);
+        }
+      }
+    }
+  ];
+
+  const renderCommandPalette = (
+    <CommandPalette
+      open={commandPaletteOpen}
+      onClose={() => setCommandPaletteOpen(false)}
+      files={files}
+      onSelectFile={(file) => {
+        flushLiveContent();
+        openFileInActivePane(file);
+        setShowHomeScreen(false);
+        setMobileTab('editor');
+      }}
+      commands={paletteCommands}
+    />
+  );
+
+  /* ===================== HOME / WELCOME SCREEN (IPAD & IPHONE) ===================== */
+  if (showHomeScreen) {
+    return (
+      <>
+        {renderWallpaperBackdrop}
+        {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+
+        <HomeScreen
+          breakpoint={breakpoint}
+          tree={tree}
+          files={files}
+          pinnedPaths={pinnedPaths}
+          themeSwatch={activeAccentOverride?.primary || currentThemeObj.accentSwatch}
+          onTogglePin={handleTogglePin}
+          onCycleTheme={cycleNextTheme}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+          onOpenProjects={() => {
+            setShowHomeScreen(false);
+            if (breakpoint === 'mobile') {
+              setMobileTab('files');
+            } else {
+              setSidebarView('explorer');
+            }
+          }}
+          onOpenFile={(file) => {
+            flushLiveContent();
+            openFileInActivePane(file);
+            setLivePreviewOpen(false);
+            setShowHomeScreen(false);
+            setMobileTab('editor');
+          }}
+          onRunActive={() => {
+            setShowHomeScreen(false);
+            setMobileTab('editor');
+            if (activeFile) {
+              window.setTimeout(() => {
+                handleRun();
+              }, 80);
+            }
+          }}
+          onQuickStart={handleQuickStartFromHome}
+          onCreateProject={handleCreateProjectFromHome}
+          onRenameEntry={handleRenameEntry}
+          onExportProjectZip={handleExportProjectZip}
+          onImportCodeFiles={handleImportCodeFiles}
+          onDeleteEntry={handleDeleteEntry}
+          onExportBackup={handleExportBackup}
+          onImportBackup={handleImportBackup}
+          onReplaySplash={() => setShowSplash(true)}
+        />
+
+        {renderCommandPalette}
+
+        <SettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          mode={mode}
+          onChangeMode={handleSwitchMode}
+          editorSettings={editorSettings}
+          onUpdateEditor={setEditorSettings}
+          compilerSettings={compilerSettings}
+          onUpdateCompiler={handleUpdateCompiler}
+          onExportBackup={handleExportBackup}
+          onImportBackup={handleImportBackup}
+          uiTheme={uiTheme}
+          onChangeUiTheme={handleChangeUiTheme}
+          uiDensity={uiDensity}
+          onChangeUiDensity={setUiDensity}
+          typingSound={typingSound}
+          onChangeTypingSound={setTypingSound}
+          visualPrefs={visualPrefs}
+          onUpdateVisualPrefs={handleUpdateVisualPrefs}
+        />
+
+        <FloatingToast
+          toast={toast}
+          isMobile={breakpoint === 'mobile'}
+          isRunning={isRunning || isRunningTests}
+          runningLabel={runningIslandLabel}
+          celebrateKey={celebrateKey}
+        />
+      </>
+    );
+  }
 
   /* ===================== MOBILE VIEW ===================== */
   if (breakpoint === 'mobile') {
     return (
       <div
-        style={{ paddingTop: 'var(--safe-top)', backgroundColor: 'var(--bg-canvas)' }}
-        className="w-full h-full flex flex-col overflow-hidden theme-scope"
+        onTouchStart={handleEdgeTouchStart}
+        onTouchEnd={handleEdgeTouchEnd}
+        style={{ backgroundColor: 'var(--bg-canvas)' }}
+        className="glass-canvas ios-view-push w-full h-full flex flex-col overflow-hidden theme-scope relative z-10"
       >
+        {renderWallpaperBackdrop}
         <header
-          style={{ backgroundColor: 'var(--bg-panel)' }}
-          className="mx-2 mt-2 h-12 px-3 rounded-2xl flex items-center justify-between shrink-0 shadow-md"
+          style={{
+            backgroundColor: 'var(--bg-panel)',
+            borderBottom: '1px solid var(--border-subtle)'
+          }}
+          className="h-13 px-3 flex items-center justify-between gap-2 shrink-0 relative z-20"
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-semibold truncate">{activeFile?.name || 'Code IDE'}</span>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => setShowHomeScreen(true)}
+              style={{ color: 'var(--text-primary)' }}
+              className="w-9 h-9 rounded-xl hover:bg-[var(--bg-elevated)] flex items-center justify-center shrink-0 btn-lift"
+              title="Về Trang chủ"
+            >
+              <Home size={18} />
+            </button>
+            {activeFile && <FileTypeIcon fileName={activeFile.name} size={17} className="shrink-0" />}
+            <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+              {activeFile?.name || 'Code With You'}
+            </span>
+            {activeFile?.dirty && (
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <HeaderTimer />
+            {isRunning ? (
+              <button
+                type="button"
+                onClick={handleKill}
+                className="h-9 px-3.5 rounded-xl bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 btn-lift"
+              >
+                <Square size={11} fill="currentColor" />
+                <span>Stop</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRun}
+                className="h-9 px-3.5 rounded-xl run-btn font-bold text-xs flex items-center justify-center gap-1.5 btn-lift"
+              >
+                <Play size={12} fill="currentColor" />
+                <span>{isWebLanguage(activeFile?.language) ? 'Live' : 'Run'}</span>
+              </button>
+            )}
 
             <button
-              onClick={cycleNextTheme}
-              className="h-9 px-2.5 rounded-xl flex items-center gap-1.5 bg-[var(--bg-elevated)] btn-lift text-xs font-medium"
-              title="Đổi giao diện"
-            >
-              <span
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: currentThemeObj.accentSwatch }}
-              />
-              <Palette size={14} />
-            </button>
-
-            <button
-              onClick={handleRun}
-              disabled={isRunning}
-              className="h-9 px-3.5 rounded-xl accent-btn font-semibold text-xs flex items-center justify-center gap-1.5 btn-lift"
-            >
-              <Play size={13} fill="currentColor" />
-              <span>{isWebLanguage(activeFile?.language) ? 'Live' : isRunning ? '...' : 'Run'}</span>
-            </button>
-
-            <button
+              type="button"
               onClick={() => setMobileMoreOpen((v) => !v)}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-[var(--bg-elevated)] btn-lift"
+              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+              className="w-9 h-9 flex items-center justify-center rounded-xl btn-lift"
+              title="Tùy chọn khác"
             >
               <MoreHorizontal size={17} />
             </button>
@@ -1339,36 +2821,57 @@ export default function App() {
         </header>
 
         {mobileMoreOpen && (
-          <div className="mx-2 mt-1.5 ide-card px-3 py-2.5 flex flex-col gap-2 text-xs tab-content-enter">
-            <div className="flex items-center justify-between">
-              <span style={{ color: 'var(--text-secondary)' }}>
-                Theme: <b style={{ color: 'var(--text-primary)' }}>{currentThemeObj.name}</b>
-              </span>
+          <div className="mx-2.5 mt-2 ide-card p-3 flex flex-col gap-2.5 text-xs ios-popover-enter relative z-30">
+            <div className="flex items-center justify-between gap-2">
+              <HeaderTimer align="left" />
               <button
-                onClick={cycleNextTheme}
-                className="py-1.5 px-3 rounded-xl bg-[var(--bg-elevated)] btn-lift font-medium"
+                type="button"
+                onClick={() => {
+                  setMobileMoreOpen(false);
+                  setCommandPaletteOpen(true);
+                }}
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                className="h-9 px-3 rounded-xl font-semibold flex items-center gap-1.5 btn-lift"
               >
-                Đổi Theme khác
+                <Command size={14} className="text-sky-400" />
+                <span>Tìm nhanh</span>
               </button>
             </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
+                type="button"
                 onClick={() => {
                   handleFormat();
                   setMobileMoreOpen(false);
                 }}
-                className="flex-1 py-2 px-3 rounded-xl bg-[var(--bg-elevated)] btn-lift font-medium"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                className="py-2 px-2 rounded-xl btn-lift font-medium flex items-center justify-center gap-1"
               >
-                Format Code
+                <Wand2 size={12} className="text-sky-400" />
+                <span>Format</span>
               </button>
               <button
+                type="button"
+                onClick={cycleNextTheme}
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                className="py-2 px-2 rounded-xl btn-lift font-medium flex items-center justify-center gap-1"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: currentThemeObj.accentSwatch }}
+                />
+                <span className="truncate">Theme</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setEditorSettings((s) => ({ ...s, lineNumbers: s.lineNumbers === 'on' ? 'off' : 'on' }));
                   setMobileMoreOpen(false);
                 }}
-                className="flex-1 py-2 px-3 rounded-xl bg-[var(--bg-elevated)] btn-lift font-medium"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                className="py-2 px-2 rounded-xl btn-lift font-medium"
               >
-                Số dòng: {editorSettings.lineNumbers.toUpperCase()}
+                Dòng: {editorSettings.lineNumbers === 'on' ? 'Bật' : 'Tắt'}
               </button>
             </div>
           </div>
@@ -1376,9 +2879,8 @@ export default function App() {
 
         <div className="flex-1 min-h-0 flex flex-col p-2 relative">
           <div
-            key={mobileTab}
-            className={`flex-1 min-h-0 flex flex-col ide-card overflow-hidden tab-content-enter ${
-              mobileTab === 'editor' ? 'flex' : 'hidden'
+            className={`flex-1 min-h-0 flex flex-col ide-card overflow-hidden ${
+              mobileTab === 'editor' ? 'flex tab-content-enter' : 'hidden'
             }`}
           >
             {livePreviewOpen ? (
@@ -1408,7 +2910,13 @@ export default function App() {
                   onQuickCreateTemplate={handleCreateTemplateFile}
                   onQuickCreateWebProject={handleCreateWebStarterProject}
                 />
-                <MobileCodingToolbar language={mobileToolbarLang} onInsertToken={handleInsertToken} />
+                <MobileCodingToolbar
+                  language={mobileToolbarLang}
+                  onInsertToken={handleInsertToken}
+                  onUndo={handleEditorUndo}
+                  onRedo={handleEditorRedo}
+                  onMoveCursor={handleMoveCursor}
+                />
               </>
             )}
           </div>
@@ -1427,6 +2935,8 @@ export default function App() {
                 }}
                 onCreateFile={handleCreateFile}
                 onCreateFolder={handleCreateFolder}
+                onRenameEntry={handleRenameEntry}
+                onImportCodeFiles={handleImportCodeFiles}
                 onDeleteEntry={handleDeleteEntry}
                 onRefresh={() => loadWorkspaceForMode(mode)}
               />
@@ -1435,10 +2945,27 @@ export default function App() {
 
           {mobileTab === 'terminal' && (
             <div
-              className="flex-1 min-h-0 flex flex-col justify-end rounded-2xl overflow-hidden tab-content-enter"
+              className="flex-1 min-h-0 flex flex-col justify-end rounded-2xl overflow-hidden ios-backdrop-enter"
               onClick={() => setMobileTab('editor')}
             >
-              <div onClick={(e) => e.stopPropagation()} className="ide-card overflow-hidden">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  transform: sheetDragY > 0 ? `translate3d(0, ${sheetDragY}px, 0)` : undefined,
+                  transition: sheetDragStartRef.current === null ? 'transform 0.3s var(--ease-ios-spring)' : 'none'
+                }}
+                className="ide-card overflow-hidden ios-sheet-enter"
+              >
+                <div
+                  onPointerDown={handleTerminalSheetDragStart}
+                  onPointerMove={handleTerminalSheetDragMove}
+                  onPointerUp={() => handleTerminalSheetDragEnd(() => setMobileTab('editor'))}
+                  onPointerCancel={() => handleTerminalSheetDragEnd(() => setMobileTab('editor'))}
+                  className="pt-2.5 pb-1.5 flex justify-center shrink-0 touch-none cursor-grab active:cursor-grabbing"
+                  title="Vuốt xuống để đóng"
+                >
+                  <span className="w-10 h-1 rounded-full opacity-40" style={{ backgroundColor: 'var(--text-secondary)' }} />
+                </div>
                 <BottomPanel
                   mode={mode}
                   logs={logs}
@@ -1446,11 +2973,19 @@ export default function App() {
                   isRunning={isRunning}
                   stdinPreset={stdinPreset}
                   autoEof={autoEof}
+                  testCases={activeTestCases}
+                  testResults={activeTestResults}
+                  isRunningTests={isRunningTests}
+                  onChangeTestCases={handleChangeActiveTestCases}
+                  onRunAllTests={handleRunAllTests}
+                  onRunSingleTest={handleRunSingleTest}
                   onChangeStdinPreset={setStdinPreset}
                   onChangeAutoEof={setAutoEof}
                   onRunWithInput={handleRun}
                   onSendStdin={handleSendStdin}
-                  onSendEof={() => runWsRef.current?.send(JSON.stringify({ type: 'eof' }))}
+                  onSendEof={handleSendEof}
+                  isWaitingForInput={isWaitingForInput}
+                  hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
                   onKill={handleKill}
                   onClear={() => setLogs([])}
                   onJumpToDiagnostic={(d) => {
@@ -1485,17 +3020,32 @@ export default function App() {
           onExportBackup={handleExportBackup}
           onImportBackup={handleImportBackup}
           uiTheme={uiTheme}
-          onChangeUiTheme={setUiTheme}
+          onChangeUiTheme={handleChangeUiTheme}
           uiDensity={uiDensity}
           onChangeUiDensity={setUiDensity}
           typingSound={typingSound}
           onChangeTypingSound={setTypingSound}
+          visualPrefs={visualPrefs}
+          onUpdateVisualPrefs={handleUpdateVisualPrefs}
         />
 
-        <FloatingToast toast={toast} isMobile />
+        {renderCommandPalette}
+
+        <FloatingToast
+          toast={toast}
+          isMobile
+          isRunning={isRunning || isRunningTests}
+          runningLabel={runningIslandLabel}
+          celebrateKey={celebrateKey}
+        />
 
         {!isKeyboardOpen && (
-          <MobileNav activeTab={mobileTab} onSelectTab={(t) => setMobileTab(t)} problemCount={allDiagnostics.length} />
+          <MobileNav
+            activeTab={mobileTab}
+            onSelectTab={(t) => setMobileTab(t)}
+            onGoHome={() => setShowHomeScreen(true)}
+            problemCount={allDiagnostics.length}
+          />
         )}
       </div>
     );
@@ -1503,92 +3053,177 @@ export default function App() {
 
   /* ===================== DESKTOP & IPAD TABLET VIEW ===================== */
   const splitDirection = breakpoint === 'tablet' && width < height ? 'flex-col' : 'flex-row';
-  const outerGapClass = uiDensity === 'compact' ? 'px-1.5 gap-1.5' : 'px-2.5 gap-2.5';
+  const splitIsVertical = splitDirection === 'flex-col';
+  const outerGapClass = zenMode
+    ? 'p-4 sm:p-8 gap-0'
+    : uiDensity === 'compact'
+      ? 'gap-0'
+      : 'p-2 gap-2';
+  const showRightConsoleDock =
+    bottomOpen && consoleDock === 'right' && (breakpoint === 'desktop' || width >= 900);
+  const showRightPanel = !zenMode && (ipadRightTool !== null || showRightConsoleDock);
+  const projectKey = activeFile?.path || 'workspace';
 
   return (
     <div
+      onTouchStart={handleEdgeTouchStart}
+      onTouchEnd={handleEdgeTouchEnd}
+      onDragEnter={handleWorkspaceDragEnter}
+      onDragOver={handleWorkspaceDragOver}
+      onDragLeave={handleWorkspaceDragLeave}
+      onDrop={handleWorkspaceDrop}
       style={{
-        paddingTop: `calc(var(--safe-top) + ${uiDensity === 'compact' ? '4px' : '8px'})`,
-        paddingBottom: `calc(var(--safe-bottom) + ${uiDensity === 'compact' ? '4px' : '8px'})`,
-        backgroundColor: 'var(--bg-canvas)'
+        backgroundColor: 'var(--bg-canvas)',
+        color: 'var(--text-primary)'
       }}
-      className={`w-full h-full flex flex-col ${outerGapClass} overflow-hidden select-none`}
+      className={`glass-canvas ios-view-push w-full h-full flex flex-col ${outerGapClass} overflow-hidden select-none relative z-10`}
     >
-      {/* TOP FLOATING HEADER BAR */}
-      <header className="ide-card h-13 px-3.5 py-2 flex items-center justify-between gap-3 shrink-0 relative z-30">
-        <div className="flex items-center gap-2.5 min-w-0">
+      {renderWallpaperBackdrop}
+
+      {/* AMBIENT MESH ORBS IN CINEMA ZEN MODE */}
+      {zenMode && (
+        <div aria-hidden="true" className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+          <div
+            className="zen-orb-a absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-20"
+            style={{ background: 'radial-gradient(circle, var(--accent-primary) 0%, transparent 70%)' }}
+          />
+          <div
+            className="zen-orb-b absolute -bottom-24 -right-24 w-96 h-96 rounded-full blur-3xl opacity-20"
+            style={{ background: 'radial-gradient(circle, #10B981 0%, transparent 70%)' }}
+          />
+        </div>
+      )}
+
+      {/* FLOATING GLASS EXIT PILL IN ZEN MODE */}
+      {zenMode && (
+        <div className="fixed top-3 right-4 z-40 flex items-center gap-1.5 ios-popover-enter">
+          <button
+            type="button"
+            onClick={handleRun}
+            className="h-8 px-3 rounded-full run-btn text-xs font-bold flex items-center gap-1.5 shadow-lg btn-lift"
+          >
+            <Play size={11} fill="currentColor" />
+            <span>{isWebLanguage(activeFile?.language) ? 'Go Live' : 'Run'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={toggleFocusMode}
+            style={{
+              backgroundColor: 'var(--bg-panel)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-subtle)'
+            }}
+            className="h-8 px-3 rounded-full backdrop-blur-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg btn-lift"
+            title="Thoát Zen Mode (Esc)"
+          >
+            <Minimize2 size={13} style={{ color: 'var(--accent-primary)' }} />
+            <span>Thoát Zen</span>
+          </button>
+        </div>
+      )}
+
+      {/* SLEEK UNIFIED TOP HEADER (CURSOR / SWIFT PLAYGROUNDS STYLE) */}
+      {!zenMode && (
+      <header
+        style={{
+          backgroundColor: 'var(--bg-panel)',
+          borderBottom: uiDensity === 'compact' ? '1px solid var(--border-subtle)' : undefined
+        }}
+        className={`${uiDensity === 'compact' ? 'glass-surface' : 'ide-card'} h-12 px-3 flex items-center justify-between gap-3 shrink-0 relative z-30`}
+      >
+        {/* Left: Home Logo + Sidebar + Split toggle */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => setShowHomeScreen(true)}
+            className="h-8 px-2 rounded-xl hover:bg-[var(--bg-elevated)] flex items-center gap-2 btn-lift"
+            title="Về Trang chủ (Home)"
+          >
+            <img src="/app-logo.png" alt="Home" className="w-6 h-6 rounded-md object-contain" />
+            <span className="hidden xl:inline text-xs font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              Code With You
+            </span>
+          </button>
+
           <button
             onClick={() => setSidebarView((prev) => (prev ? null : 'explorer'))}
-            className={`p-2 rounded-xl text-xs btn-lift shrink-0 ${
+            className={`w-8 h-8 rounded-xl flex items-center justify-center btn-lift ${
               sidebarView
                 ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
-                : 'bg-transparent text-[var(--text-secondary)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/60'
             }`}
-            title="Ẩn / Hiện thanh thư mục"
+            title="Ẩn / Hiện thanh thư mục (⌘B)"
           >
             <PanelLeft size={16} />
           </button>
 
-          <div className="hidden md:flex items-center p-1 rounded-2xl bg-[var(--bg-panel-alt)] gap-1 shrink-0">
-            <button
-              onClick={() => {
-                if (splitOpen) handleToggleSplit();
-              }}
-              className={`tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 ${
-                !splitOpen
-                  ? 'accent-pill-active'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Sparkles size={13} />
-              <span>Single Editor</span>
-            </button>
-
-            <button
-              onClick={() => {
-                if (!splitOpen) handleToggleSplit();
-              }}
-              className={`tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 ${
-                splitOpen
-                  ? 'accent-pill-active'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Columns size={13} />
-              <span>Split View</span>
-            </button>
-
-            <button
-              onClick={() => handleSwitchMode(mode === 'local' ? 'standalone' : 'local')}
-              className="tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              title="Chuyển chế độ Cloud (Pyodide/GCC) hoặc Local PC"
-            >
-              <Cpu size={13} className="text-emerald-500" />
-              <span>{mode === 'standalone' ? 'Cloud + WASM' : 'Local PC'}</span>
-            </button>
-          </div>
+          <button
+            onClick={handleToggleSplit}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center btn-lift ${
+              splitOpen
+                ? 'bg-[var(--bg-active)] text-[var(--accent-primary)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/60'
+            }`}
+            title="Bật / Tắt chia đôi màn hình Split View (⌘\)"
+          >
+            <Columns size={16} />
+          </button>
         </div>
 
-        {/* Right Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Center: Clickable Active File / Command Palette Pill */}
+        <button
+          type="button"
+          onClick={() => setCommandPaletteOpen(true)}
+          style={{
+            backgroundColor: 'var(--bg-panel-alt)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--text-secondary)'
+          }}
+          className="hidden sm:flex flex-1 max-w-md h-8 px-3 rounded-xl items-center justify-between gap-2 text-xs hover:bg-[var(--bg-elevated)] transition-colors min-w-0"
+          title="Mở Command Palette & tìm tệp nhanh (⌘P)"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Search size={13} className="shrink-0 opacity-70" />
+            <span className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>
+              {activeFile?.path || 'Tìm tệp hoặc lệnh...'}
+            </span>
+          </div>
+          <kbd
+            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
+            className="px-1.5 py-0.5 rounded-md font-mono text-[10px] shrink-0"
+          >
+            ⌘P
+          </kbd>
+        </button>
+
+        {/* Right Controls — Quiet Native macOS / iPadOS Toolbar */}
+        <div className="flex items-center gap-1 shrink-0">
           <HeaderTimer />
+
+          <span className="w-px h-4 mx-1 opacity-70" style={{ backgroundColor: 'var(--border-subtle)' }} />
 
           <div className="relative" ref={themeMenuRef}>
             <button
               onClick={() => setThemePickerOpen((v) => !v)}
-              className="h-9 px-3 rounded-xl bg-[var(--bg-elevated)] flex items-center gap-2 text-xs font-medium btn-lift"
-              title="Thay đổi giao diện & bố cục"
+              style={{ color: 'var(--text-secondary)' }}
+              className="h-8 px-2 rounded-lg hover:bg-[var(--bg-elevated)]/80 hover:text-[var(--text-primary)] flex items-center gap-1.5 text-xs font-medium transition-colors"
+              title={`Theme: ${currentThemeObj.name}`}
             >
               <span
-                className="w-3.5 h-3.5 rounded-full"
+                className="w-2.5 h-2.5 rounded-full"
                 style={{ backgroundColor: currentThemeObj.accentSwatch }}
               />
               <Palette size={14} />
-              <span className="hidden lg:inline">{currentThemeObj.name}</span>
             </button>
 
             {themePickerOpen && (
-              <div className="absolute right-0 mt-2 w-72 ide-card p-3.5 z-50 tab-content-enter shadow-2xl">
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-panel)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-primary)'
+                }}
+                className="absolute right-0 mt-2 w-72 rounded-2xl p-3.5 z-50 ios-popover-enter shadow-2xl"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                     Chủ đề màu sắc (Theme)
@@ -1605,9 +3240,10 @@ export default function App() {
                       <button
                         key={t.id}
                         onClick={() => {
-                          setUiTheme(t.id);
+                          handleChangeUiTheme(t.id);
                           showToast(`Theme: ${t.name}`, 'info');
                         }}
+                        style={{ color: 'var(--text-primary)' }}
                         className={`w-full px-3 py-2 rounded-xl text-left text-xs font-medium flex items-center justify-between transition-all btn-lift ${
                           selected
                             ? 'bg-[var(--bg-active)]'
@@ -1664,7 +3300,8 @@ export default function App() {
                       toggleFocusMode();
                       setThemePickerOpen(false);
                     }}
-                    className="w-full py-2 px-3 rounded-xl bg-[var(--bg-elevated)] text-xs font-medium flex items-center justify-center gap-1.5 btn-lift"
+                    style={{ color: 'var(--text-primary)' }}
+                    className="w-full py-2 px-3 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-xs font-medium flex items-center justify-center gap-1.5 btn-lift"
                   >
                     {isFocusMode ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
                     <span>{isFocusMode ? 'Thoát chế độ Tập trung' : 'Chế độ Tập trung (Zen Mode)'}</span>
@@ -1675,230 +3312,422 @@ export default function App() {
           </div>
 
           <button
+            onClick={toggleFocusMode}
+            className="h-8 w-8 rounded-lg text-xs transition-colors flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/75"
+            title="Chế độ Tập trung (Zen Mode)"
+          >
+            <Maximize2 size={14} />
+          </button>
+
+          <button
             onClick={() => setBottomOpen((v) => !v)}
-            className={`h-9 px-2.5 rounded-xl text-xs btn-lift flex items-center gap-1.5 ${
+            className={`h-8 w-8 rounded-lg text-xs transition-colors flex items-center justify-center ${
               bottomOpen
-                ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
-                : 'text-[var(--text-secondary)]'
+                ? 'bg-[var(--bg-active)] text-[var(--accent-primary)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/75'
             }`}
-            title="Ẩn / Hiện bảng Terminal bên dưới"
+            title="Ẩn / Hiện bảng Console & Tests (⌘J)"
           >
             <PanelBottom size={15} />
           </button>
 
           <button
             onClick={() => setSettingsOpen(true)}
-            className="h-9 w-9 rounded-xl bg-[var(--bg-elevated)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] btn-lift"
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/75 transition-colors"
             title="Cài đặt chi tiết"
           >
             <Settings size={15} />
           </button>
 
+          <span className="w-px h-4 mx-1 opacity-70" style={{ backgroundColor: 'var(--border-subtle)' }} />
+
           {isRunning ? (
             <button
               onClick={handleKill}
-              className="h-9 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-500/30 btn-lift"
+              className="h-8 px-3.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-500/25 btn-lift"
             >
-              <Square size={12} fill="currentColor" />
+              <Square size={11} fill="currentColor" />
               <span>Stop</span>
             </button>
           ) : (
             <button
               onClick={handleRun}
-              className="h-9 px-4 rounded-xl accent-btn font-semibold text-xs flex items-center gap-1.5 btn-lift"
+              className="h-8 px-3.5 rounded-lg run-btn font-bold text-xs flex items-center gap-1.5 btn-lift"
             >
-              <Play size={13} fill="currentColor" />
-              <span>{isWebLanguage(activeFile?.language) ? 'Go Live' : 'Run Code'}</span>
+              <Play size={12} fill="currentColor" />
+              <span>{isWebLanguage(activeFile?.language) ? 'Go Live' : 'Run'}</span>
             </button>
           )}
         </div>
       </header>
+      )}
 
       {/* MAIN WORKSPACE */}
-      <div className={`flex-1 min-h-0 flex ${uiDensity === 'compact' ? 'gap-1.5' : 'gap-2.5'} relative`}>
-        {/* LEFT EXPLORER / SEARCH CARD */}
+      <div
+        className={`flex-1 min-h-0 flex ${
+          zenMode ? 'max-w-5xl mx-auto w-full relative z-10' : uiDensity === 'compact' ? 'gap-0' : 'gap-2'
+        } relative z-10`}
+      >
+        {/* LEFT EXPLORER / SEARCH / OUTLINE CARD (RESIZABLE) */}
         {sidebarView && breakpoint === 'desktop' && (
-          <aside className="w-64 shrink-0 ide-card flex flex-col overflow-hidden tab-content-enter">
-            <div className="p-2.5 flex items-center justify-between gap-1.5">
-              <div className="flex-1 flex p-1 rounded-xl bg-[var(--bg-panel-alt)]">
-                <button
-                  onClick={() => setSidebarView('explorer')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 tab-pill ${
-                    sidebarView === 'explorer'
-                      ? 'accent-pill-active'
-                      : 'text-[var(--text-secondary)]'
-                  }`}
-                >
-                  <FolderOpen size={13} />
-                  <span>Files</span>
-                </button>
-                <button
-                  onClick={() => setSidebarView('search')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 tab-pill ${
-                    sidebarView === 'search'
-                      ? 'accent-pill-active'
-                      : 'text-[var(--text-secondary)]'
-                  }`}
-                >
-                  <Search size={13} />
-                  <span>Search</span>
-                </button>
-              </div>
-            </div>
-
-            <div className={`flex-1 min-h-0 overflow-hidden theme-scope ${sidebarView === 'explorer' ? 'explorer-clean' : ''}`}>
-              {sidebarView === 'explorer' ? (
-                <ExplorerSidebar
-                  tree={tree}
-                  files={files}
-                  activeFile={activeFile}
-                  onSelectFile={openFileInActivePane}
-                  onCreateFile={handleCreateFile}
-                  onCreateFolder={handleCreateFolder}
-                  onDeleteEntry={handleDeleteEntry}
-                  onRefresh={() => loadWorkspaceForMode(mode)}
-                />
-              ) : (
-                <SearchSidebar
-                  files={files}
-                  onJump={(f, line, col) => {
-                    openFileInActivePane(f);
-                    setTimeout(() => {
-                      activeEditorRef.current?.revealLineInCenter(line);
-                      activeEditorRef.current?.setPosition({ lineNumber: line, column: col });
-                      activeEditorRef.current?.focus();
-                    }, 40);
-                  }}
-                />
-              )}
-            </div>
-
-            <div className="p-3 m-2.5 rounded-2xl bg-[var(--bg-panel-alt)] space-y-2">
-              <div className="flex items-center justify-between">
-                <span
-                  style={{ color: 'var(--text-primary)' }}
-                  className="text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {files.length} tệp trong Workspace
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => sidebarAssetInputRef.current?.click()}
-                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-                className="w-full py-1.5 px-2.5 rounded-xl font-medium text-[11px] flex items-center justify-center gap-1.5 btn-lift"
+          <>
+            <aside
+              style={{ width: `${sidebarWidth}px` }}
+              className="shrink-0 ide-card flex flex-col overflow-hidden tab-content-enter"
+            >
+              <div
+                style={{ borderBottom: '1px solid var(--border-subtle)' }}
+                className="p-2 flex items-center justify-between gap-1 shrink-0"
               >
-                <ImagePlus size={12} className="text-emerald-500" />
-                <span>Import Ảnh / Font / JSON</span>
-              </button>
-              <input
-                ref={sidebarAssetInputRef}
-                type="file"
-                multiple
-                accept="image/*,.json,.woff,.woff2,.ttf,.otf"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    handleImportAssets(e.target.files);
-                    e.target.value = '';
-                  }
-                }}
-              />
+                <div className="flex-1 grid grid-cols-3 p-0.5 rounded-lg bg-[var(--bg-panel-alt)] gap-0.5">
+                  <button
+                    onClick={() => setSidebarView('explorer')}
+                    style={{
+                      backgroundColor: sidebarView === 'explorer' ? 'var(--bg-elevated)' : 'transparent',
+                      color: sidebarView === 'explorer' ? 'var(--text-primary)' : 'var(--text-secondary)'
+                    }}
+                    className="py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <FolderOpen size={12} />
+                    <span>Files</span>
+                  </button>
+                  <button
+                    onClick={() => setSidebarView('search')}
+                    style={{
+                      backgroundColor: sidebarView === 'search' ? 'var(--bg-elevated)' : 'transparent',
+                      color: sidebarView === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)'
+                    }}
+                    className="py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Search size={12} />
+                    <span>Search</span>
+                  </button>
+                  <button
+                    onClick={() => setSidebarView('outline')}
+                    style={{
+                      backgroundColor: sidebarView === 'outline' ? 'var(--bg-elevated)' : 'transparent',
+                      color: sidebarView === 'outline' ? 'var(--text-primary)' : 'var(--text-secondary)'
+                    }}
+                    className="py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                    title="Mục lục cấu trúc code (⌘⇧O)"
+                  >
+                    <ListTree size={12} />
+                    <span>Outline</span>
+                  </button>
+                </div>
+              </div>
 
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={handleExportBackup}
-                  className="flex-1 py-1.5 px-2.5 rounded-xl accent-btn font-medium text-[11px] flex items-center justify-center gap-1 btn-lift"
-                >
-                  <Download size={12} />
-                  <span>Backup</span>
-                </button>
-                <label
-                  style={{ color: 'var(--text-primary)' }}
-                  className="flex-1 py-1.5 px-2.5 rounded-xl bg-[var(--bg-elevated)] font-medium text-[11px] flex items-center justify-center gap-1 cursor-pointer btn-lift"
-                >
-                  <Upload size={12} />
-                  <span>Restore</span>
-                  <input
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleImportBackup(f);
+              <div className={`flex-1 min-h-0 overflow-hidden theme-scope ${sidebarView === 'explorer' ? 'explorer-clean' : ''}`}>
+                {sidebarView === 'explorer' ? (
+                  <ExplorerSidebar
+                    tree={tree}
+                    files={files}
+                    activeFile={activeFile}
+                    onSelectFile={openFileInActivePane}
+                    onCreateFile={handleCreateFile}
+                    onCreateFolder={handleCreateFolder}
+                    onRenameEntry={handleRenameEntry}
+                    onImportCodeFiles={handleImportCodeFiles}
+                    onDeleteEntry={handleDeleteEntry}
+                    onRefresh={() => loadWorkspaceForMode(mode)}
+                  />
+                ) : sidebarView === 'search' ? (
+                  <SearchSidebar
+                    files={files}
+                    onJump={(f, line, col) => {
+                      openFileInActivePane(f);
+                      setTimeout(() => {
+                        activeEditorRef.current?.revealLineInCenter(line);
+                        activeEditorRef.current?.setPosition({ lineNumber: line, column: col });
+                        activeEditorRef.current?.focus();
+                      }, 40);
                     }}
                   />
-                </label>
+                ) : (
+                  <OutlinePanel
+                    file={activeFile}
+                    currentLine={cursor.line}
+                    onJumpToLine={(line) => {
+                      activeEditorRef.current?.revealLineInCenter(line);
+                      activeEditorRef.current?.setPosition({ lineNumber: line, column: 1 });
+                      activeEditorRef.current?.focus();
+                    }}
+                  />
+                )}
               </div>
+
+              {/* Quiet 1-line Sidebar Footer */}
+              <div
+                style={{
+                  borderTop: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)'
+                }}
+                className="h-8 px-3 flex items-center justify-between text-[11px] shrink-0"
+              >
+                <span className="truncate opacity-80">{files.length} tệp</span>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => sidebarAssetInputRef.current?.click()}
+                    className="w-6 h-6 rounded-md hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
+                    title="Import Ảnh / Font / JSON"
+                  >
+                    <ImagePlus size={12} />
+                  </button>
+                  <input
+                    ref={sidebarAssetInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.json,.woff,.woff2,.ttf,.otf"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleImportAssets(e.target.files);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleExportBackup}
+                    className="w-6 h-6 rounded-md hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
+                    title="Sao lưu Workspace (JSON)"
+                  >
+                    <Download size={12} />
+                  </button>
+                  <label
+                    className="w-6 h-6 rounded-md hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center cursor-pointer transition-colors"
+                    title="Khôi phục Workspace (JSON)"
+                  >
+                    <Upload size={12} />
+                    <input
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleImportBackup(f);
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </aside>
+
+            {/* RESIZABLE SIDEBAR DIVIDER */}
+            <div
+              onPointerDown={startResizeSidebar}
+              title="Kéo trái / phải để chỉnh độ rộng Sidebar"
+              className="w-1.5 -mx-0.5 cursor-col-resize touch-none flex items-center justify-center group shrink-0"
+            >
+              <span className="w-0.5 h-12 rounded-full bg-transparent group-hover:bg-[var(--accent-primary)] transition-colors" />
             </div>
-          </aside>
+          </>
         )}
 
         {sidebarView && breakpoint === 'tablet' && (
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs flex p-3" onClick={() => setSidebarView(null)}>
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex p-3 ios-backdrop-enter"
+            onClick={() => setSidebarView(null)}
+          >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="h-full w-72 ide-card overflow-hidden theme-scope explorer-clean tab-content-enter"
+              className="h-full w-80 max-w-[85vw] ide-card flex flex-col overflow-hidden ios-drawer-enter"
             >
-              <ExplorerSidebar
-                tree={tree}
-                files={files}
-                activeFile={activeFile}
-                onSelectFile={(f) => {
-                  openFileInActivePane(f);
-                  setSidebarView(null);
+              <div
+                style={{ borderBottom: '1px solid var(--border-subtle)' }}
+                className="p-2 flex items-center justify-between gap-1 shrink-0"
+              >
+                <div className="flex-1 grid grid-cols-3 p-0.5 rounded-lg bg-[var(--bg-panel-alt)] gap-0.5">
+                  <button
+                    onClick={() => setSidebarView('explorer')}
+                    style={{
+                      backgroundColor: sidebarView === 'explorer' ? 'var(--bg-elevated)' : 'transparent',
+                      color: sidebarView === 'explorer' ? 'var(--text-primary)' : 'var(--text-secondary)'
+                    }}
+                    className="py-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <FolderOpen size={12} />
+                    <span>Files</span>
+                  </button>
+                  <button
+                    onClick={() => setSidebarView('search')}
+                    style={{
+                      backgroundColor: sidebarView === 'search' ? 'var(--bg-elevated)' : 'transparent',
+                      color: sidebarView === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)'
+                    }}
+                    className="py-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Search size={12} />
+                    <span>Search</span>
+                  </button>
+                  <button
+                    onClick={() => setSidebarView('outline')}
+                    style={{
+                      backgroundColor: sidebarView === 'outline' ? 'var(--bg-elevated)' : 'transparent',
+                      color: sidebarView === 'outline' ? 'var(--text-primary)' : 'var(--text-secondary)'
+                    }}
+                    className="py-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <ListTree size={12} />
+                    <span>Outline</span>
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className={`flex-1 min-h-0 overflow-hidden theme-scope ${
+                  sidebarView === 'explorer' ? 'explorer-clean' : ''
+                }`}
+              >
+                {sidebarView === 'explorer' ? (
+                  <ExplorerSidebar
+                    tree={tree}
+                    files={files}
+                    activeFile={activeFile}
+                    onSelectFile={(f) => {
+                      openFileInActivePane(f);
+                      setSidebarView(null);
+                    }}
+                    onCreateFile={handleCreateFile}
+                    onCreateFolder={handleCreateFolder}
+                    onRenameEntry={handleRenameEntry}
+                    onImportCodeFiles={handleImportCodeFiles}
+                    onDeleteEntry={handleDeleteEntry}
+                    onRefresh={() => loadWorkspaceForMode(mode)}
+                    onCloseMobile={() => setSidebarView(null)}
+                    isOverlay
+                  />
+                ) : sidebarView === 'search' ? (
+                  <SearchSidebar
+                    files={files}
+                    onJump={(f, line, col) => {
+                      openFileInActivePane(f);
+                      setSidebarView(null);
+                      setTimeout(() => {
+                        activeEditorRef.current?.revealLineInCenter(line);
+                        activeEditorRef.current?.setPosition({ lineNumber: line, column: col });
+                        activeEditorRef.current?.focus();
+                      }, 40);
+                    }}
+                  />
+                ) : (
+                  <OutlinePanel
+                    file={activeFile}
+                    currentLine={cursor.line}
+                    onJumpToLine={(line) => {
+                      setSidebarView(null);
+                      setTimeout(() => {
+                        activeEditorRef.current?.revealLineInCenter(line);
+                        activeEditorRef.current?.setPosition({ lineNumber: line, column: 1 });
+                        activeEditorRef.current?.focus();
+                      }, 40);
+                    }}
+                  />
+                )}
+              </div>
+
+              <div
+                style={{
+                  borderTop: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)'
                 }}
-                onCreateFile={handleCreateFile}
-                onCreateFolder={handleCreateFolder}
-                onDeleteEntry={handleDeleteEntry}
-                onRefresh={() => loadWorkspaceForMode(mode)}
-                onCloseMobile={() => setSidebarView(null)}
-                isOverlay
-              />
+                className="h-9 px-3 flex items-center justify-between text-[11px] shrink-0"
+              >
+                <span>{files.length} tệp</span>
+                <div className="flex items-center gap-1">
+                  <label
+                    className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center cursor-pointer"
+                    title="Import Ảnh / Font / JSON"
+                  >
+                    <ImagePlus size={13} />
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.json,.woff,.woff2,.ttf,.otf"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          handleImportAssets(e.target.files);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleExportBackup}
+                    className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center"
+                    title="Sao lưu Workspace"
+                  >
+                    <Download size={13} />
+                  </button>
+                  <label
+                    className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center cursor-pointer"
+                    title="Khôi phục Workspace"
+                  >
+                    <Upload size={13} />
+                    <input
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleImportBackup(f);
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* RIGHT COLUMN: EDITOR (+ LIVE SERVER PREVIEW) ON TOP + TERMINAL AT BOTTOM */}
         <div className={`flex-1 min-w-0 min-h-0 flex flex-col ${uiDensity === 'compact' ? 'gap-1.5' : 'gap-2.5'}`}>
-          {/* EDITOR CARD */}
+          {/* EDITOR CARD — ARCHITECTURAL FLUSH TABS + BREADCRUMB BAR */}
           <main className="flex-1 min-w-0 min-h-0 ide-card flex flex-col overflow-hidden">
-            <div className="px-2.5 pt-2 pb-1.5 flex items-center justify-between gap-2 bg-[var(--bg-panel-alt)]/60">
-              <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            <div
+              style={{
+                backgroundColor: 'var(--bg-panel-alt)',
+                borderBottom: '1px solid var(--border-subtle)'
+              }}
+              className="h-9 flex items-stretch justify-between shrink-0"
+            >
+              <div className="flex-1 min-w-0 flex items-stretch overflow-x-auto no-scrollbar">
                 {openTabs.map((tab) => {
                   const isActive = activeFile?.path === tab.path;
                   return (
                     <div
                       key={tab.path}
                       onClick={() => openFileInActivePane(tab)}
-                      className={`tab-pill group px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer shrink-0 ${
-                        isActive
-                          ? 'accent-pill-active'
-                          : 'bg-[var(--bg-elevated)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      style={{
+                        backgroundColor: isActive ? 'var(--bg-panel)' : 'transparent',
+                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        borderRight: '1px solid var(--border-subtle)'
+                      }}
+                      className={`group relative px-3 text-xs font-medium flex items-center gap-2 cursor-pointer shrink-0 transition-colors ${
+                        isActive ? '' : 'hover:bg-[var(--bg-elevated)]/40 hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      <FileTypeIcon
-                        fileName={tab.name}
-                        size={15}
-                        className={isActive ? 'drop-shadow-xs' : ''}
-                      />
-                      <span className="truncate max-w-[140px]">{tab.name}</span>
+                      {isActive && (
+                        <span
+                          aria-hidden="true"
+                          style={{ backgroundColor: 'var(--accent-primary)' }}
+                          className="absolute top-0 left-0 right-0 h-[2px]"
+                        />
+                      )}
+                      <FileTypeIcon fileName={tab.name} size={14} />
+                      <span className="truncate max-w-[150px]">{tab.name}</span>
                       {tab.dirty && (
                         <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            isActive ? 'bg-white' : 'bg-[var(--accent-primary)]'
-                          }`}
+                          style={{ backgroundColor: 'var(--accent-primary)' }}
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
                         />
                       )}
                       <button
                         onClick={(e) => closeTab(tab.path, e)}
-                        className={`p-0.5 rounded-md transition-opacity ${
-                          isActive
-                            ? 'hover:bg-white/20 text-white'
-                            : 'opacity-60 group-hover:opacity-100 hover:bg-black/10'
-                        }`}
+                        className="p-0.5 rounded-md opacity-50 group-hover:opacity-100 hover:bg-[var(--bg-elevated)] transition-opacity"
                       >
                         <X size={12} />
                       </button>
@@ -1908,27 +3737,28 @@ export default function App() {
 
                 <button
                   onClick={handleQuickNewFile}
-                  className="p-1.5 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] btn-lift shrink-0"
+                  style={{ color: 'var(--text-secondary)' }}
+                  className="px-2.5 hover:bg-[var(--bg-elevated)]/50 hover:text-[var(--text-primary)] transition-colors flex items-center justify-center shrink-0"
                   title="Tạo nhanh tệp mới"
                 >
                   <Plus size={14} />
                 </button>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1 px-2 shrink-0">
                 {showLiveServerBtn && (
                   <button
                     onClick={handleToggleLiveServer}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 btn-lift ${
-                      livePreviewOpen
-                        ? 'accent-pill-active'
-                        : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
+                    style={{
+                      backgroundColor: livePreviewOpen ? 'var(--bg-active)' : 'transparent',
+                      color: livePreviewOpen ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                    }}
+                    className="h-7 px-2 rounded-md text-[11px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
                     title="Bật / Tắt Live Server xem trước web theo thời gian thực"
                   >
                     <Radio
-                      size={13}
-                      className={livePreviewOpen ? 'animate-pulse text-white' : 'text-emerald-500'}
+                      size={12}
+                      className={livePreviewOpen ? 'animate-pulse' : 'text-emerald-500'}
                     />
                     <span>{livePreviewOpen ? 'Port :5500' : 'Go Live'}</span>
                   </button>
@@ -1936,47 +3766,64 @@ export default function App() {
 
                 <button
                   onClick={handleFormat}
-                  className="px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] text-xs font-medium flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] btn-lift"
+                  style={{ color: 'var(--text-secondary)' }}
+                  className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
                   title="Định dạng mã nguồn"
                 >
-                  <Wand2 size={13} style={{ color: 'var(--accent-primary)' }} />
+                  <Wand2 size={12} style={{ color: 'var(--accent-primary)' }} />
                   <span className="hidden xl:inline">Format</span>
                 </button>
               </div>
             </div>
 
-            <div className="px-3.5 py-1.5 flex items-center justify-between text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-              <div className="flex items-center gap-2 min-w-0">
-                {activeFile && <FileTypeIcon fileName={activeFile.name} size={14} />}
-                <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                  {activeFile?.path || 'Chưa mở tệp'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2.5 shrink-0">
-                <span>{activeLineCount} lines</span>
-                <span>
-                  Ln {cursor.line}, Col {cursor.column}
-                </span>
-                {activeFile && (
-                  <span
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase ${getFileBadgeColor(
-                      activeFile.language
-                    )}`}
-                  >
-                    {activeFile.language}
-                  </span>
+            {/* CRISP CODE BREADCRUMB BAR (CURSOR / VS CODE STYLE) */}
+            {activeFile && !livePreviewOpen && (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-panel)',
+                  borderBottom: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)'
+                }}
+                className="h-6 px-3 flex items-center gap-1 text-[11px] shrink-0 overflow-x-auto no-scrollbar"
+              >
+                {activeFile.path.split('/').map((segment, idx, arr) => (
+                  <React.Fragment key={`${segment}-${idx}`}>
+                    {idx > 0 && <ChevronRight size={11} className="opacity-45 shrink-0" />}
+                    <span
+                      style={
+                        idx === arr.length - 1 ? { color: 'var(--text-primary)' } : undefined
+                      }
+                      className={idx === arr.length - 1 ? 'font-medium truncate' : 'opacity-75 truncate'}
+                    >
+                      {segment}
+                    </span>
+                  </React.Fragment>
+                ))}
+                {activeBreadcrumbSymbol && (
+                  <>
+                    <ChevronRight size={11} className="opacity-45 shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => setSidebarView('outline')}
+                      style={{ color: 'var(--accent-primary)' }}
+                      className="font-mono text-[11px] font-medium hover:underline truncate"
+                      title="Mở mục lục cấu trúc (Outline)"
+                    >
+                      {activeBreadcrumbSymbol.name}
+                    </button>
+                  </>
                 )}
               </div>
-            </div>
+            )}
 
             <div
-              key={activeFile?.path || 'empty-editor'}
-              className={`flex-1 min-h-0 min-w-0 flex tab-content-enter ${splitDirection}`}
+              ref={splitContainerRef}
+              className={`flex-1 min-h-0 min-w-0 flex ${splitDirection}`}
             >
               <div
                 onClick={() => setActivePane('primary')}
-                className={`flex-1 min-w-0 min-h-0 flex flex-col relative ${
+                style={splitOpen ? { flexBasis: `${splitRatio}%`, flexGrow: 0, flexShrink: 0 } : undefined}
+                className={`${splitOpen ? '' : 'flex-1'} min-w-0 min-h-0 flex flex-col relative ${
                   splitOpen && activePane === 'primary' ? 'ring-2 ring-inset ring-[var(--accent-primary)]/40 rounded-b-2xl' : ''
                 }`}
               >
@@ -2015,6 +3862,7 @@ export default function App() {
                   onCursorChange={(line, column) => {
                     if (activePane === 'primary') setCursor({ line, column });
                   }}
+                  onChangeFontSize={(sz) => setEditorSettings((prev) => ({ ...prev, fontSize: sz }))}
                   onQuickCreateTemplate={handleCreateTemplateFile}
                   onQuickCreateWebProject={handleCreateWebStarterProject}
                 />
@@ -2040,144 +3888,138 @@ export default function App() {
               )}
 
               {splitOpen && (
-                <div
-                  onClick={() => setActivePane('secondary')}
-                  className={`flex-1 min-w-0 min-h-0 flex flex-col relative ${
-                    activePane === 'secondary' ? 'ring-2 ring-inset ring-[var(--accent-primary)]/40 rounded-b-2xl' : ''
-                  }`}
-                >
-                  <div className="h-8 px-3 bg-[var(--bg-panel-alt)] flex items-center justify-between text-[11px]">
-                    <select
-                      value={secondaryPath || ''}
-                      onChange={(e) => {
-                        flushLiveContent();
-                        setSecondaryPath(e.target.value);
-                      }}
-                      className="bg-transparent text-[var(--text-primary)] outline-none cursor-pointer truncate max-w-[80%]"
-                    >
-                      {files.map((f) => (
-                        <option key={f.path} value={f.path}>
-                          {f.path}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex items-center gap-1.5">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-500 text-[10px] font-semibold">
-                        PANE 2
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          flushLiveContent();
-                          setSplitOpen(false);
-                          setActivePane('primary');
-                        }}
-                        className="p-1 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
+                <>
+                  {/* RESIZABLE SPLIT EDITOR HANDLE */}
+                  <div
+                    onPointerDown={(e) => startResizeSplit(e, splitIsVertical)}
+                    title="Kéo để thay đổi tỷ lệ Split Editor"
+                    style={{ backgroundColor: 'var(--border-subtle)' }}
+                    className={`${
+                      splitIsVertical
+                        ? 'h-2 w-full cursor-row-resize'
+                        : 'w-2 h-full cursor-col-resize'
+                    } touch-none flex items-center justify-center group shrink-0 hover:bg-[var(--accent-primary)]/40 transition-colors`}
+                  >
+                    <span
+                      className={`${
+                        splitIsVertical ? 'w-10 h-0.5' : 'w-0.5 h-10'
+                      } rounded-full bg-[var(--text-secondary)]/40 group-hover:bg-[var(--accent-primary)] transition-colors`}
+                    />
                   </div>
 
-                  <CodeEditor
-                    file={secondaryFile}
-                    settings={editorSettings}
-                    breakpoint={breakpoint}
-                    editorRef={secondaryEditorRef}
-                    typingSound={typingSound}
-                    onChange={(val) => handleCodeChange(secondaryFile, val)}
-                    onSave={() => saveFile(secondaryFile || undefined, undefined, true)}
-                    onRun={handleRun}
-                    onFocusEditor={() => setActivePane('secondary')}
-                    onCursorChange={(line, column) => {
-                      if (activePane === 'secondary') setCursor({ line, column });
-                    }}
-                    onQuickCreateTemplate={handleCreateTemplateFile}
-                    onQuickCreateWebProject={handleCreateWebStarterProject}
-                  />
-                </div>
+                  <div
+                    onClick={() => setActivePane('secondary')}
+                    className={`flex-1 min-w-0 min-h-0 flex flex-col relative ${
+                      activePane === 'secondary' ? 'ring-2 ring-inset ring-[var(--accent-primary)]/40 rounded-b-2xl' : ''
+                    }`}
+                  >
+                    <div className="h-8 px-3 bg-[var(--bg-panel-alt)] flex items-center justify-between text-[11px]">
+                      <select
+                        value={secondaryPath || ''}
+                        onChange={(e) => {
+                          flushLiveContent();
+                          setSecondaryPath(e.target.value);
+                        }}
+                        className="bg-transparent text-[var(--text-primary)] outline-none cursor-pointer truncate max-w-[80%]"
+                      >
+                        {files.map((f) => (
+                          <option key={f.path} value={f.path}>
+                            {f.path}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-500 text-[10px] font-semibold">
+                          PANE 2
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            flushLiveContent();
+                            setSplitOpen(false);
+                            setActivePane('primary');
+                          }}
+                          className="p-1 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <CodeEditor
+                      file={secondaryFile}
+                      settings={editorSettings}
+                      breakpoint={breakpoint}
+                      editorRef={secondaryEditorRef}
+                      typingSound={typingSound}
+                      onChange={(val) => handleCodeChange(secondaryFile, val)}
+                      onSave={() => saveFile(secondaryFile || undefined, undefined, true)}
+                      onRun={handleRun}
+                      onFocusEditor={() => setActivePane('secondary')}
+                      onCursorChange={(line, column) => {
+                        if (activePane === 'secondary') setCursor({ line, column });
+                      }}
+                      onChangeFontSize={(sz) => setEditorSettings((prev) => ({ ...prev, fontSize: sz }))}
+                      onQuickCreateTemplate={handleCreateTemplateFile}
+                      onQuickCreateWebProject={handleCreateWebStarterProject}
+                    />
+                  </div>
+                </>
               )}
             </div>
 
-            {breakpoint === 'tablet' && isKeyboardOpen && (
+            {(breakpoint === 'tablet' || isTouchDevice) &&
+              isKeyboardOpen &&
+              !editorSettings.hardwareKeyboardMode && (
               <div className="theme-scope">
-                <MobileCodingToolbar language={mobileToolbarLang} onInsertToken={handleInsertToken} />
+                <MobileCodingToolbar
+                  language={mobileToolbarLang}
+                  onInsertToken={handleInsertToken}
+                  onUndo={handleEditorUndo}
+                  onRedo={handleEditorRedo}
+                  onMoveCursor={handleMoveCursor}
+                />
               </div>
             )}
           </main>
 
-          {/* BOTTOM TERMINAL / CONSOLE CARD (DESKTOP) */}
-          {bottomOpen && breakpoint === 'desktop' && (
+          {/* BOTTOM TERMINAL / CONSOLE CARD (DESKTOP WHEN DOCKED BOTTOM) */}
+          {bottomOpen && breakpoint === 'desktop' && consoleDock === 'bottom' && (
             <section
               style={{ height: `${bottomHeight}px` }}
-              className="w-full shrink-0 ide-card flex flex-col overflow-hidden tab-content-enter relative"
+              className="w-full shrink-0 ide-card flex flex-col overflow-hidden ios-sheet-enter relative"
             >
               <div
-                onMouseDown={startResizeBottom}
-                title="Kéo lên / xuống để chỉnh chiều cao Terminal"
-                className="h-2.5 w-full cursor-row-resize flex items-center justify-center group shrink-0"
+                onPointerDown={startResizeBottom}
+                title="Kéo lên / xuống để chỉnh chiều cao Console"
+                style={{ backgroundColor: 'var(--bg-panel-alt)' }}
+                className="h-3 w-full cursor-row-resize touch-none flex items-center justify-center group shrink-0"
               >
-                <span className="w-10 h-1 rounded-full bg-[var(--bg-elevated)] group-hover:bg-[var(--accent-primary)] transition-colors" />
+                <span className="w-10 h-1 rounded-full bg-[var(--bg-hover)] group-hover:bg-[var(--accent-primary)] transition-colors" />
               </div>
 
-              <div className="px-3.5 pb-1.5 flex items-center justify-between gap-3 shrink-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-lg accent-btn flex items-center justify-center shrink-0">
-                    <Sparkles size={13} />
-                  </div>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                      {isRunning
-                        ? 'Đang thực thi mã nguồn...'
-                        : lastElapsedMs !== null
-                          ? `Hoàn thành trong ${lastElapsedMs}ms`
-                          : livePreviewOpen
-                            ? 'Live Server Console (127.0.0.1:5500)'
-                            : 'Console & Test Input'}
-                    </h3>
-                    <span
-                      className="hidden sm:inline text-[11px] truncate"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      •{' '}
-                      {isWebLanguage(activeFile?.language)
-                        ? 'HTML5 / CSS3 / ES2024 CSS Hot-Reload Engine'
-                        : activeFile?.language === 'python'
-                          ? 'Pyodide WebAssembly Worker (Offline Ready)'
-                          : 'GCC 14.2 Compiler Explorer Engine'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="w-32 sm:w-44 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden shrink-0">
-                  <div
-                    style={{
-                      background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))'
-                    }}
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      isRunning || livePreviewOpen
-                        ? 'w-3/4 animate-pulse'
-                        : lastElapsedMs !== null
-                          ? 'w-full'
-                          : 'w-1/4 opacity-50'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div className="flex-1 min-h-0 overflow-hidden theme-scope flex flex-col">
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <BottomPanel
                   mode={mode}
                   logs={logs}
                   diagnostics={allDiagnostics}
                   isRunning={isRunning}
+                  lastElapsedMs={lastElapsedMs}
                   stdinPreset={stdinPreset}
                   autoEof={autoEof}
+                  testCases={activeTestCases}
+                  testResults={activeTestResults}
+                  isRunningTests={isRunningTests}
+                  onChangeTestCases={handleChangeActiveTestCases}
+                  onRunAllTests={handleRunAllTests}
+                  onRunSingleTest={handleRunSingleTest}
                   onChangeStdinPreset={setStdinPreset}
                   onChangeAutoEof={setAutoEof}
                   onRunWithInput={handleRun}
                   onSendStdin={handleSendStdin}
-                  onSendEof={() => runWsRef.current?.send(JSON.stringify({ type: 'eof' }))}
+                  onSendEof={handleSendEof}
+                  isWaitingForInput={isWaitingForInput}
+                  hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
                   onKill={handleKill}
                   onClear={() => {
                     setLogs([]);
@@ -2193,22 +4035,112 @@ export default function App() {
                     }, 40);
                   }}
                   onClose={() => setBottomOpen(false)}
+                  dockPosition={consoleDock}
+                  onToggleDockPosition={handleToggleConsoleDock}
+                  requestedTab={requestedConsoleTab}
                 />
               </div>
             </section>
           )}
         </div>
 
-        {/* TABLET CONSOLE SHEET */}
-        {bottomOpen && breakpoint === 'tablet' && (
+        {/* IPAD PRO RIGHT UTILITY PANEL: PENCIL SCRATCHPAD / PROBLEM NOTES / RIGHT-DOCKED CONSOLE */}
+        {showRightPanel && (
+          <>
+            <div
+              onPointerDown={startResizeRightPanel}
+              title="Kéo trái / phải để chỉnh độ rộng khung bên phải"
+              className="w-1.5 -mx-0.5 cursor-col-resize touch-none flex items-center justify-center group shrink-0"
+            >
+              <span className="w-0.5 h-12 rounded-full bg-transparent group-hover:bg-[var(--accent-primary)] transition-colors" />
+            </div>
+
+            <aside
+              style={{ width: `${Math.min(rightPanelWidth, Math.max(280, width - 320))}px` }}
+              className="shrink-0 ide-card flex flex-col overflow-hidden tab-content-enter"
+            >
+              {ipadRightTool === 'scratchpad' ? (
+                <PencilScratchpad
+                  projectKey={projectKey}
+                  onClose={() => setIpadRightTool(null)}
+                  onExportToast={(msg) => showToast(msg, 'success')}
+                />
+              ) : ipadRightTool === 'notes' ? (
+                <ProblemNotesPane
+                  projectKey={projectKey}
+                  onSendSampleToTests={handleSendSampleToTests}
+                  onClose={() => setIpadRightTool(null)}
+                />
+              ) : (
+                <BottomPanel
+                  mode={mode}
+                  logs={logs}
+                  diagnostics={allDiagnostics}
+                  isRunning={isRunning}
+                  lastElapsedMs={lastElapsedMs}
+                  stdinPreset={stdinPreset}
+                  autoEof={autoEof}
+                  testCases={activeTestCases}
+                  testResults={activeTestResults}
+                  isRunningTests={isRunningTests}
+                  onChangeTestCases={handleChangeActiveTestCases}
+                  onRunAllTests={handleRunAllTests}
+                  onRunSingleTest={handleRunSingleTest}
+                  onChangeStdinPreset={setStdinPreset}
+                  onChangeAutoEof={setAutoEof}
+                  onRunWithInput={handleRun}
+                  onSendStdin={handleSendStdin}
+                  onSendEof={handleSendEof}
+                  isWaitingForInput={isWaitingForInput}
+                  hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
+                  onKill={handleKill}
+                  onClear={() => {
+                    setLogs([]);
+                    setLastElapsedMs(null);
+                  }}
+                  onJumpToDiagnostic={(d) => {
+                    const found = files.find((f) => f.uri === d.uri);
+                    if (found) openFileInActivePane(found);
+                    setTimeout(() => {
+                      activeEditorRef.current?.revealLineInCenter(d.line);
+                      activeEditorRef.current?.setPosition({ lineNumber: d.line, column: d.column });
+                      activeEditorRef.current?.focus();
+                    }, 40);
+                  }}
+                  onClose={() => setBottomOpen(false)}
+                  dockPosition={consoleDock}
+                  onToggleDockPosition={handleToggleConsoleDock}
+                  requestedTab={requestedConsoleTab}
+                />
+              )}
+            </aside>
+          </>
+        )}
+
+        {/* TABLET CONSOLE SHEET (VUỐT XUỐNG ĐỂ ĐÓNG - KHI KHÔNG GẮN PHẢI) */}
+        {bottomOpen && breakpoint === 'tablet' && !showRightConsoleDock && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs flex flex-col justify-end p-3"
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex flex-col justify-end p-3 ios-backdrop-enter"
             onClick={() => setBottomOpen(false)}
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="ide-card overflow-hidden theme-scope tab-content-enter"
+              style={{
+                transform: sheetDragY > 0 ? `translate3d(0, ${sheetDragY}px, 0)` : undefined,
+                transition: sheetDragStartRef.current === null ? 'transform 0.3s var(--ease-ios-spring)' : 'none'
+              }}
+              className="ide-card overflow-hidden theme-scope ios-sheet-enter"
             >
+              <div
+                onPointerDown={handleTerminalSheetDragStart}
+                onPointerMove={handleTerminalSheetDragMove}
+                onPointerUp={() => handleTerminalSheetDragEnd(() => setBottomOpen(false))}
+                onPointerCancel={() => handleTerminalSheetDragEnd(() => setBottomOpen(false))}
+                className="pt-2.5 pb-1.5 flex justify-center shrink-0 touch-none cursor-grab active:cursor-grabbing"
+                title="Vuốt xuống để đóng"
+              >
+                <span className="w-10 h-1 rounded-full opacity-40" style={{ backgroundColor: 'var(--text-secondary)' }} />
+              </div>
               <BottomPanel
                 mode={mode}
                 logs={logs}
@@ -2216,11 +4148,19 @@ export default function App() {
                 isRunning={isRunning}
                 stdinPreset={stdinPreset}
                 autoEof={autoEof}
+                testCases={activeTestCases}
+                testResults={activeTestResults}
+                isRunningTests={isRunningTests}
+                onChangeTestCases={handleChangeActiveTestCases}
+                onRunAllTests={handleRunAllTests}
+                onRunSingleTest={handleRunSingleTest}
                 onChangeStdinPreset={setStdinPreset}
                 onChangeAutoEof={setAutoEof}
                 onRunWithInput={handleRun}
                 onSendStdin={handleSendStdin}
-                onSendEof={() => runWsRef.current?.send(JSON.stringify({ type: 'eof' }))}
+                onSendEof={handleSendEof}
+                isWaitingForInput={isWaitingForInput}
+                hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
                 onKill={handleKill}
                 onClear={() => setLogs([])}
                 onJumpToDiagnostic={(d) => {
@@ -2233,27 +4173,97 @@ export default function App() {
                   }, 40);
                 }}
                 onClose={() => setBottomOpen(false)}
+                requestedTab={requestedConsoleTab}
                 isSheet
               />
             </div>
           </div>
         )}
+
+        {/* RIGHT INSPECTOR ACTIVITY RAIL (XCODE / CURSOR / JETBRAINS STYLE — ZERO CODE OVERLAP) */}
+        {!zenMode && (
+          <IpadFloatingDock
+            consoleDock={consoleDock}
+            bottomOpen={bottomOpen}
+            rightTool={ipadRightTool}
+            diffOpen={diffOpen}
+            trackpadOpen={trackpadOpen}
+            hardwareKeyboardMode={Boolean(editorSettings.hardwareKeyboardMode)}
+            compact={uiDensity === 'compact'}
+            onToggleConsoleDock={handleToggleConsoleDock}
+            onToggleRightTool={handleToggleRightTool}
+            onToggleDiff={() => setDiffOpen((v) => !v)}
+            onToggleTrackpad={() => setTrackpadOpen((v) => !v)}
+            onToggleHardwareKeyboardMode={handleToggleHardwareKeyboardMode}
+            onOpenShortcutsHud={() => {
+              setShortcutsHudHoldMode(false);
+              setShortcutsHudOpen(true);
+            }}
+          />
+        )}
       </div>
 
-      {/* FLOATING ROUNDED STATUS BAR */}
-      <div className="ide-card overflow-hidden status-bar-wrap shrink-0">
-        <StatusBar
-          mode={mode}
-          onToggleMode={() => handleSwitchMode(mode === 'local' ? 'standalone' : 'local')}
-          activeFile={activeFile}
-          cursor={cursor}
-          editorSettings={editorSettings}
-          compilerSettings={compilerSettings}
-          lspStatus={lspStatus}
-          errorCount={allDiagnostics.filter((d) => d.severity === 'error').length}
-          onChangeCompiler={handleUpdateCompiler}
-        />
-      </div>
+      {/* QUIET SLEEK STATUS BAR */}
+      {!zenMode && (
+        <div
+          className={`${
+            uiDensity === 'compact'
+              ? ''
+              : 'rounded-xl overflow-hidden border border-[var(--border-subtle)]'
+          } glass-surface shrink-0 relative z-10`}
+        >
+          <StatusBar
+            mode={mode}
+            onToggleMode={() => handleSwitchMode(mode === 'local' ? 'standalone' : 'local')}
+            activeFile={activeFile}
+            cursor={cursor}
+            editorSettings={editorSettings}
+            compilerSettings={compilerSettings}
+            lspStatus={lspStatus}
+            errorCount={allDiagnostics.filter((d) => d.severity === 'error').length}
+            onChangeCompiler={handleUpdateCompiler}
+            onOpenShortcutsHud={() => {
+              setShortcutsHudHoldMode(false);
+              setShortcutsHudOpen(true);
+            }}
+          />
+        </div>
+      )}
+
+      {/* IPAD VIRTUAL TRACKPAD OVERLAY */}
+      <VirtualTrackpad
+        open={trackpadOpen}
+        onMoveCursor={handleTrackpadMove}
+        onSelectLine={handleTrackpadSelectLine}
+        onSelectBlock={handleTrackpadSelectBlock}
+        onJumpLineEdge={handleTrackpadJumpEdge}
+        onClose={() => setTrackpadOpen(false)}
+      />
+
+      {/* SIDE-BY-SIDE DIFF VIEWER MODAL */}
+      <DiffViewerModal
+        open={diffOpen}
+        files={liveFiles}
+        activeFile={activeFile}
+        snapshots={fileSnapshots}
+        monacoTheme={currentThemeObj.mode === 'light' ? 'code-ide-light' : 'code-ide-dark'}
+        fontSize={editorSettings.fontSize}
+        onSaveSnapshot={handleSaveDiffSnapshot}
+        onClose={() => setDiffOpen(false)}
+      />
+
+      {/* MAGIC KEYBOARD HOLD-⌘ SHORTCUTS HUD */}
+      <KeyboardShortcutsHud
+        open={shortcutsHudOpen}
+        isHoldMode={shortcutsHudHoldMode}
+        onClose={() => {
+          setShortcutsHudOpen(false);
+          setShortcutsHudHoldMode(false);
+        }}
+      />
+
+      {/* IPADOS SPLIT VIEW DRAG & DROP OVERLAY */}
+      <DropZoneOverlay visible={isDragOverWorkspace} />
 
       <SettingsModal
         open={settingsOpen}
@@ -2267,14 +4277,23 @@ export default function App() {
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
         uiTheme={uiTheme}
-        onChangeUiTheme={setUiTheme}
+        onChangeUiTheme={handleChangeUiTheme}
         uiDensity={uiDensity}
         onChangeUiDensity={setUiDensity}
         typingSound={typingSound}
         onChangeTypingSound={setTypingSound}
+        visualPrefs={visualPrefs}
+        onUpdateVisualPrefs={handleUpdateVisualPrefs}
       />
 
-      <FloatingToast toast={toast} />
+      {renderCommandPalette}
+
+      <FloatingToast
+        toast={toast}
+        isRunning={isRunning || isRunningTests}
+        runningLabel={runningIslandLabel}
+        celebrateKey={celebrateKey}
+      />
     </div>
   );
 }

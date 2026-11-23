@@ -35,7 +35,10 @@ jobs:
 
       - name: Apply App Icon for iPad & iPhone
         run: |
-          ICON_SRC="client/public/icon-512.png"
+          ICON_SRC="client/public/icon-1024.png"
+          if [ ! -f "$ICON_SRC" ]; then
+            ICON_SRC="client/public/icon-512.png"
+          fi
           ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ] && [ -d "$ICON_DIR" ]; then
             rm -f "$ICON_DIR"/*.png
@@ -61,12 +64,28 @@ jobs:
       - name: Configure iPadOS Info.plist (Split View, Files App, Status Bar)
         run: |
           PLIST="ios/App/App/Info.plist"
-          plutil -replace CFBundleDisplayName -string "LocalCode IDE" "$PLIST"
+          plutil -replace CFBundleDisplayName -string "Code With You" "$PLIST"
           plutil -replace UIFileSharingEnabled -bool true "$PLIST"
           plutil -replace LSSupportsOpeningDocumentsInPlace -bool true "$PLIST"
           plutil -replace UIRequiresFullScreen -bool false "$PLIST"
           plutil -replace UIStatusBarStyle -string "UIStatusBarStyleLightContent" "$PLIST"
           plutil -replace UIViewControllerBasedStatusBarAppearance -bool false "$PLIST"
+          # Đồng bộ màu nền LaunchScreen iOS sang Midnight Navy (#080C18) để không bị chớp trắng khi mở app
+          python3 - << 'PYEOF'
+          import os, glob, struct, zlib
+          def make_solid_png(w, h, r, g, b):
+            raw = b"".join(b"\x00" + bytes([r, g, b]) * w for _ in range(h))
+            def chunk(t, d):
+              return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+            ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+            return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+          splash_dir = "ios/App/App/Assets.xcassets/Splash.imageset"
+          if os.path.isdir(splash_dir):
+            png = make_solid_png(64, 64, 8, 12, 24)
+            for p in glob.glob(os.path.join(splash_dir, "*.png")):
+              with open(p, "wb") as f:
+                f.write(png)
+          PYEOF
 
       - name: Build Unsigned iOS/iPadOS App Bundle
         run: |

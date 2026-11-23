@@ -1,9 +1,17 @@
 // client/src/workers/pyodideWorker.ts
 
+interface WorkspaceDataFile {
+  name: string;
+  content: string;
+}
+
 interface RunPayload {
   type: 'run';
   code: string;
   stdin: string;
+  interactive?: boolean;
+  workspaceFiles?: WorkspaceDataFile[];
+  syncFiles?: boolean;
 }
 
 const PYODIDE_VERSION = '0.26.4';
@@ -67,27 +75,103 @@ workerCtx.onmessage = async (event: MessageEvent<RunPayload>) => {
 
     pyodide.globals.set('__USER_CODE__', msg.code);
     pyodide.globals.set('__USER_STDIN__', msg.stdin ?? '');
+    pyodide.globals.set('__INTERACTIVE_MODE__', Boolean(msg.interactive));
+    pyodide.globals.set('__SYNC_FILES__', Boolean(msg.syncFiles));
+    pyodide.globals.set('__WORKSPACE_FILES_JSON__', JSON.stringify(msg.workspaceFiles || []));
 
     const runnerScript = `
 import sys
 import io
+import os
+import json
+import builtins
 import traceback
+
+class _WaitForInput(BaseException):
+    pass
+
+class _InteractiveStdin:
+    def __init__(self, data):
+        self._buf = data
+        self._pos = 0
+    def readline(self, size=-1):
+        if self._pos >= len(self._buf):
+            raise _WaitForInput()
+        nl = self._buf.find('\\n', self._pos)
+        end = len(self._buf) if nl == -1 else nl + 1
+        if size is not None and size >= 0:
+            end = min(end, self._pos + size)
+        chunk = self._buf[self._pos:end]
+        self._pos = end
+        return chunk
+    def read(self, size=-1):
+        if self._pos >= len(self._buf):
+            raise _WaitForInput()
+        if size is None or size < 0:
+            chunk = self._buf[self._pos:]
+            self._pos = len(self._buf)
+            return chunk
+        chunk = self._buf[self._pos:self._pos + size]
+        self._pos += len(chunk)
+        return chunk
+    def __iter__(self):
+        return self
+    def __next__(self):
+        line = self.readline()
+        if not line:
+            raise StopIteration
+        return line
+
+_mounted_map = {}
+_pre_files = set()
+if __SYNC_FILES__:
+    try:
+        for _entry in os.listdir('.'):
+            if os.path.isfile(_entry):
+                _pre_files.add(_entry)
+        for _wf in json.loads(__WORKSPACE_FILES_JSON__):
+            _wname = os.path.basename(_wf.get('name', ''))
+            _wcontent = _wf.get('content', '')
+            if _wname and '/' not in _wname:
+                with open(_wname, 'w', encoding='utf-8') as _f:
+                    _f.write(_wcontent)
+                _mounted_map[_wname] = _wcontent
+    except Exception:
+        pass
 
 _old_stdin = sys.stdin
 _old_stdout = sys.stdout
 _old_stderr = sys.stderr
+_old_input = builtins.input
 
-sys.stdin = io.StringIO(__USER_STDIN__)
 _out_buf = io.StringIO()
 _err_buf = io.StringIO()
 sys.stdout = _out_buf
 sys.stderr = _err_buf
 
+if __INTERACTIVE_MODE__:
+    sys.stdin = _InteractiveStdin(__USER_STDIN__)
+    def _interactive_input(prompt=''):
+        if prompt:
+            sys.stdout.write(str(prompt))
+            sys.stdout.flush()
+        line = sys.stdin.readline()
+        if line.endswith('\\n'):
+            line = line[:-1]
+        return line
+    builtins.input = _interactive_input
+else:
+    sys.stdin = io.StringIO(__USER_STDIN__)
+
 _exit_code = 0
+_waiting_input = False
 _isolated_globals = {"__name__": "__main__"}
 
 try:
     exec(compile(__USER_CODE__, "main.py", "exec"), _isolated_globals)
+except _WaitForInput:
+    _exit_code = 88
+    _waiting_input = True
 except SystemExit as e:
     _exit_code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
 except Exception:
@@ -97,14 +181,52 @@ finally:
     sys.stdin = _old_stdin
     sys.stdout = _old_stdout
     sys.stderr = _old_stderr
+    builtins.input = _old_input
 
-(_out_buf.getvalue(), _err_buf.getvalue(), _exit_code)
+_synced_out = []
+if __SYNC_FILES__ and not _waiting_input:
+    try:
+        for _entry in os.listdir('.'):
+            if _entry.startswith('.') or not os.path.isfile(_entry):
+                continue
+            if _entry in _pre_files and _entry not in _mounted_map:
+                continue
+            if _entry.endswith(('.py', '.pyc', '.so', '.wasm')):
+                continue
+            if os.path.getsize(_entry) > 131072:
+                continue
+            try:
+                with open(_entry, 'r', encoding='utf-8', errors='replace') as _rf:
+                    _txt = _rf.read()
+                if _entry in _mounted_map and _mounted_map[_entry] == _txt:
+                    continue
+                _synced_out.append({'name': _entry, 'content': _txt})
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+(_out_buf.getvalue(), _err_buf.getvalue(), _exit_code, _waiting_input, json.dumps(_synced_out))
 `;
 
     try {
       const resultProxy = await pyodide.runPythonAsync(runnerScript);
-      const [stdout, stderr, exitCode] = resultProxy.toJs() as [string, string, number];
+      const [stdout, stderr, exitCode, waitingForInput, syncedJson] = resultProxy.toJs() as [
+        string,
+        string,
+        number,
+        boolean,
+        string
+      ];
       resultProxy.destroy();
+
+      let syncedFiles: WorkspaceDataFile[] = [];
+      try {
+        const parsed = JSON.parse(syncedJson || '[]');
+        if (Array.isArray(parsed)) syncedFiles = parsed;
+      } catch {
+        // ignore
+      }
 
       const elapsedMs = Math.round(performance.now() - startTime);
       if (stdout) workerCtx.postMessage({ type: 'stdout', text: stdout });
@@ -113,11 +235,16 @@ finally:
       workerCtx.postMessage({
         type: 'done',
         exitCode: Number(exitCode) || 0,
-        elapsedMs
+        elapsedMs,
+        waitingForInput: Boolean(waitingForInput),
+        syncedFiles
       });
     } finally {
       pyodide.globals.delete('__USER_CODE__');
       pyodide.globals.delete('__USER_STDIN__');
+      pyodide.globals.delete('__INTERACTIVE_MODE__');
+      pyodide.globals.delete('__SYNC_FILES__');
+      pyodide.globals.delete('__WORKSPACE_FILES_JSON__');
     }
   } catch (err: unknown) {
     const elapsedMs = Math.round(performance.now() - startTime);

@@ -1,11 +1,11 @@
 {
   "appId": "com.localcode.ide",
-  "appName": "LocalCode IDE",
+  "appName": "Code With You",
   "webDir": "client/dist",
   "ios": {
     "contentInset": "never",
     "scrollEnabled": false,
-    "backgroundColor": "#111022",
+    "backgroundColor": "#080C18",
     "allowsLinkPreview": false
   }
 }

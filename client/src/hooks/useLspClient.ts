@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as monaco from 'monaco-editor';
 import { ExecutionMode, IdeDiagnostic, SupportedLanguage, WorkspaceFile } from '../types/ide';
-import { getStandaloneCompletions } from '../services/standaloneIntelliSense';
+import {
+  getStandaloneCompletions,
+  getStandaloneHover,
+  getStandaloneSignatureHelp
+} from '../services/standaloneIntelliSense';
 
 interface PendingRequest {
   resolve: (val: any) => void;
@@ -116,16 +120,17 @@ export function useLspClient(
 
   useEffect(() => {
     const disposables: monaco.IDisposable[] = [];
-    const langs: SupportedLanguage[] = ['cpp', 'c', 'python'];
+    const langs: SupportedLanguage[] = ['cpp', 'c', 'python', 'javascript', 'html', 'css'];
 
     langs.forEach((langId) => {
+      const isWebLang = langId === 'javascript' || langId === 'html' || langId === 'css';
       const channel: 'cpp' | 'python' = langId === 'python' ? 'python' : 'cpp';
 
       disposables.push(
         monaco.languages.registerCompletionItemProvider(langId, {
-          triggerCharacters: ['.', ':', '>', '<', '/', '"', "'", '#'],
+          triggerCharacters: ['.', ':', '>', '<', '/', '"', "'", '#', '-'],
           provideCompletionItems: async (model, position, context) => {
-            if (modeRef.current === 'standalone' || !readyRef.current[channel]) {
+            if (isWebLang || modeRef.current === 'standalone' || !readyRef.current[channel]) {
               return getStandaloneCompletions(model, position, langId, allFilesRef.current);
             }
 
@@ -195,12 +200,14 @@ export function useLspClient(
       disposables.push(
         monaco.languages.registerHoverProvider(langId, {
           provideHover: async (model, position) => {
-            if (modeRef.current === 'standalone' || !readyRef.current[channel]) return null;
+            if (isWebLang || modeRef.current === 'standalone' || !readyRef.current[channel]) {
+              return getStandaloneHover(model, position);
+            }
             const res = await sendRequest(channel, 'textDocument/hover', {
               textDocument: { uri: model.uri.toString() },
               position: { line: position.lineNumber - 1, character: position.column - 1 }
             });
-            if (!res?.contents) return null;
+            if (!res?.contents) return getStandaloneHover(model, position);
             const raw = Array.isArray(res.contents) ? res.contents[0] : res.contents;
             const value = typeof raw === 'string' ? raw : raw.value || '';
             return { contents: [{ value }] };
@@ -212,12 +219,14 @@ export function useLspClient(
         monaco.languages.registerSignatureHelpProvider(langId, {
           signatureHelpTriggerCharacters: ['(', ','],
           provideSignatureHelp: async (model, position) => {
-            if (modeRef.current === 'standalone' || !readyRef.current[channel]) return null;
+            if (isWebLang || modeRef.current === 'standalone' || !readyRef.current[channel]) {
+              return getStandaloneSignatureHelp(model, position);
+            }
             const res = await sendRequest(channel, 'textDocument/signatureHelp', {
               textDocument: { uri: model.uri.toString() },
               position: { line: position.lineNumber - 1, character: position.column - 1 }
             });
-            if (!res?.signatures?.length) return null;
+            if (!res?.signatures?.length) return getStandaloneSignatureHelp(model, position);
             return {
               dispose: () => {},
               value: {

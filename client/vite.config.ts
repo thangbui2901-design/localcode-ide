@@ -7,11 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['apple-touch-icon.png', 'icon-512.png'],
+      includeAssets: ['apple-touch-icon.png', 'icon-512.png', 'icon-1024.png', 'app-logo.png'],
       manifest: {
-        name: 'LocalCode IDE',
-        short_name: 'LocalCode',
-        description: 'C/C++ & Python IDE chạy trực tiếp trên iPad và Desktop',
+        name: 'Code With You',
+        short_name: 'Code With You',
+        description: 'IDE di động C/C++, Python & Web chạy trực tiếp trên iPad và iPhone',
         theme_color: '#1E1E1E',
         background_color: '#1E1E1E',
         display: 'standalone',

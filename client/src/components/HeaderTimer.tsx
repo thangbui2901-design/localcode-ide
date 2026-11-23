@@ -42,7 +42,11 @@ function formatDuration(totalSeconds: number): string {
   return hrs > 0 ? `${pad(hrs)}:${pad(mins)}:${pad(secs)}` : `${pad(mins)}:${pad(secs)}`;
 }
 
-export const HeaderTimer: React.FC = () => {
+interface HeaderTimerProps {
+  align?: 'left' | 'right';
+}
+
+export const HeaderTimer: React.FC<HeaderTimerProps> = ({ align = 'right' }) => {
   const [mode, setMode] = useState<TimerMode>(() => {
     const saved = localStorage.getItem('codeide_timer_mode');
     return saved === 'stopwatch' ? 'stopwatch' : 'countdown';
@@ -159,7 +163,7 @@ export const HeaderTimer: React.FC = () => {
               : 'var(--bg-elevated)',
           color: 'var(--text-primary)'
         }}
-        className="h-9 px-2.5 rounded-xl flex items-center gap-2 text-xs font-medium cursor-pointer btn-lift"
+        className="h-8 px-2 rounded-xl flex items-center gap-1.5 text-xs font-medium cursor-pointer btn-lift"
         title="Đồng hồ bấm giờ luyện tập (Bấm để chỉnh giờ)"
       >
         {finished ? (
@@ -203,7 +207,9 @@ export const HeaderTimer: React.FC = () => {
             color: 'var(--text-primary)',
             boxShadow: 'var(--shadow-card)'
           }}
-          className="absolute right-0 mt-2 w-72 rounded-2xl p-3.5 z-50 tab-content-enter space-y-3"
+          className={`absolute ${
+            align === 'left' ? 'left-0 origin-top-left' : 'right-0 origin-top-right'
+          } mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl p-3.5 z-50 ios-popover-enter space-y-3 border border-[var(--border-subtle)]`}
         >
           {/* Chọn chế độ Đếm ngược / Bấm giờ tăng */}
           <div

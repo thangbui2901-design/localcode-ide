@@ -21,6 +21,7 @@ export interface WorkspaceFile {
   content: string;
   language: SupportedLanguage;
   dirty?: boolean;
+  updatedAt?: number;
 }
 
 export interface FileNode {
@@ -29,6 +30,22 @@ export interface FileNode {
   type: 'file' | 'folder';
   children?: FileNode[];
   file?: WorkspaceFile;
+  updatedAt?: number;
+}
+
+export interface TestCaseItem {
+  id: string;
+  name: string;
+  input: string;
+  expectedOutput: string;
+}
+
+export interface TestCaseResult {
+  id: string;
+  status: 'idle' | 'running' | 'ac' | 'wa' | 'err';
+  actualOutput: string;
+  stderr?: string;
+  elapsedMs?: number;
 }
 
 export interface IdeDiagnostic {
@@ -54,6 +71,7 @@ export interface EditorSettings {
   formatOnSave: boolean;
   quickSuggestions: boolean;
   suggestOnTriggerCharacters: boolean;
+  hardwareKeyboardMode?: boolean;
   theme: string;
 }
 
