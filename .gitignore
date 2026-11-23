@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build outputs
+client/dist/
+client/.vite/
+server/dist/
+
+# Capacitor / iOS generated artifacts
+ios/
+Payload/
+*.ipa
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+*.log

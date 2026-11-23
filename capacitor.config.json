@@ -1,0 +1,11 @@
+{
+  "appId": "com.localcode.ide",
+  "appName": "LocalCode IDE",
+  "webDir": "client/dist",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#111022",
+    "allowsLinkPreview": false
+  }
+}

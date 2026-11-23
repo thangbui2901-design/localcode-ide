@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Server Test</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="hero-card">
+      <span class="badge">● LIVE :5500</span>
+      <h1>LocalCode Live Server</h1>
+      <p>Thử sửa chữ trong HTML hoặc đổi màu trong <code>style.css</code> để xem trang tự cập nhật tức thì.</p>
+      <div class="actions">
+        <button id="btn-count" class="btn-primary">Bấm thử: <span id="count">0</span></button>
+        <button id="btn-error" class="btn-ghost">Test Console Warn</button>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <h3>1. Live Reload</h3>
+        <p>Tự động đồng bộ DOM và CSS sau 220ms mỗi khi gõ phím.</p>
+      </div>
+      <div class="card">
+        <h3>2. Responsive</h3>
+        <p>Chuyển đổi khung nhìn Desktop, iPad (768px) và iPhone (375px) ở thanh trên.</p>
+      </div>
+      <div class="card">
+        <h3>3. Console Bridge</h3>
+        <p>Toàn bộ <code>console.log()</code> và lỗi JS được đẩy thẳng xuống Terminal bên dưới.</p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let count = 0;
+    const countEl = document.getElementById('count');
+
+    console.log('Live Server đã kết nối thành công!');
+    
+    document.getElementById('btn-count').addEventListener('click', () => {
+      count++;
+      countEl.textContent = count;
+      console.log('Số lần bấm hiện tại:', count);
+    });
+
+    document.getElementById('btn-error').addEventListener('click', () => {
+      console.warn('Đây là cảnh báo thử nghiệm gửi từ trang web xuống IDE!');
+    });
+  </script>
+</body>
+</html>

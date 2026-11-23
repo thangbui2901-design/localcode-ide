@@ -1,0 +1,42 @@
+[
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/g++.exe\" -std=gnu++17 -I\"D:/Source/localcode-ide/workspace/dsa_sorting\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/dsa_sorting/two_sum.cpp\"",
+    "file": "D:/Source/localcode-ide/workspace/dsa_sorting/two_sum.cpp"
+  },
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/g++.exe\" -std=gnu++17 -I\"D:/Source/localcode-ide/workspace/oop_demo\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/oop_demo/main.cpp\"",
+    "file": "D:/Source/localcode-ide/workspace/oop_demo/main.cpp"
+  },
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/g++.exe\" -std=gnu++17 -I\"D:/Source/localcode-ide/workspace/oop_demo\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/oop_demo/Student.cpp\"",
+    "file": "D:/Source/localcode-ide/workspace/oop_demo/Student.cpp"
+  },
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/g++.exe\" -std=gnu++17 -I\"D:/Source/localcode-ide/workspace/oop_demo\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/oop_demo/Student.h\"",
+    "file": "D:/Source/localcode-ide/workspace/oop_demo/Student.h"
+  },
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/gcc.exe\" -std=c11 -I\"D:/Source/localcode-ide/workspace\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/b1.c\"",
+    "file": "D:/Source/localcode-ide/workspace/b1.c"
+  },
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/gcc.exe\" -std=c11 -I\"D:/Source/localcode-ide/workspace\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/b2.c\"",
+    "file": "D:/Source/localcode-ide/workspace/b2.c"
+  },
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/gcc.exe\" -std=c11 -I\"D:/Source/localcode-ide/workspace\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/b3.c\"",
+    "file": "D:/Source/localcode-ide/workspace/b3.c"
+  },
+  {
+    "directory": "D:/Source/localcode-ide/workspace",
+    "command": "\"C:/mingw64/bin/g++.exe\" -std=gnu++17 -I\"D:/Source/localcode-ide/workspace\" -I\"D:/Source/localcode-ide/workspace\" -Wall -Wextra \"D:/Source/localcode-ide/workspace/default.cpp\"",
+    "file": "D:/Source/localcode-ide/workspace/default.cpp"
+  }
+]

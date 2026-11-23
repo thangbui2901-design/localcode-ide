@@ -1,0 +1,440 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =====================================================================
+   6 BỘ GIAO DIỆN (4 DARK THEMES + 2 LIGHT THEMES) - KHÔNG VIỀN (BORDERLESS)
+   ===================================================================== */
+
+:root,
+[data-ui-theme='midnight-indigo'] {
+  --bg-canvas: #090814;
+  --bg-panel: #111022;
+  --bg-panel-alt: #17152e;
+  --bg-elevated: #1e1c3b;
+  --bg-hover: #28254d;
+  --bg-active: rgba(124, 92, 255, 0.22);
+  --text-primary: #eceaf8;
+  --text-secondary: #928eb0;
+  --accent-primary: #7c5cff;
+  --accent-secondary: #9d7bff;
+  --accent-glow: rgba(124, 92, 255, 0.38);
+  --shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.65);
+  --editor-bg: #111022;
+}
+
+[data-ui-theme='cyber-emerald'] {
+  --bg-canvas: #060d0b;
+  --bg-panel: #0c1714;
+  --bg-panel-alt: #11211d;
+  --bg-elevated: #172b26;
+  --bg-hover: #1f3b33;
+  --bg-active: rgba(16, 185, 129, 0.2);
+  --text-primary: #e6f7f1;
+  --text-secondary: #84a89c;
+  --accent-primary: #10b981;
+  --accent-secondary: #34d399;
+  --accent-glow: rgba(16, 185, 129, 0.36);
+  --shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+  --editor-bg: #0c1714;
+}
+
+[data-ui-theme='dracula-neon'] {
+  --bg-canvas: #13141b;
+  --bg-panel: #1b1c26;
+  --bg-panel-alt: #222430;
+  --bg-elevated: #2a2c3b;
+  --bg-hover: #35384b;
+  --bg-active: rgba(189, 147, 249, 0.22);
+  --text-primary: #f8f8f2;
+  --text-secondary: #9ea4c4;
+  --accent-primary: #bd93f9;
+  --accent-secondary: #ff79c6;
+  --accent-glow: rgba(189, 147, 249, 0.36);
+  --shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.65);
+  --editor-bg: #1b1c26;
+}
+
+[data-ui-theme='vscode-dark'] {
+  --bg-canvas: #121212;
+  --bg-panel: #1e1e1e;
+  --bg-panel-alt: #252526;
+  --bg-elevated: #2d2d30;
+  --bg-hover: #37373d;
+  --bg-active: rgba(14, 165, 233, 0.22);
+  --text-primary: #e4e4e7;
+  --text-secondary: #9ca3af;
+  --accent-primary: #0ea5e9;
+  --accent-secondary: #38bdf8;
+  --accent-glow: rgba(14, 165, 233, 0.34);
+  --shadow-card: 0 10px 28px -12px rgba(0, 0, 0, 0.6);
+  --editor-bg: #1e1e1e;
+}
+
+[data-ui-theme='lavender-light'] {
+  --bg-canvas: #eaecf6;
+  --bg-panel: #ffffff;
+  --bg-panel-alt: #f3f4fb;
+  --bg-elevated: #e9ecf8;
+  --bg-hover: #dfe3f3;
+  --bg-active: rgba(109, 74, 255, 0.14);
+  --text-primary: #17162b;
+  --text-secondary: #5f5c7d;
+  --accent-primary: #6d4aff;
+  --accent-secondary: #8668ff;
+  --accent-glow: rgba(109, 74, 255, 0.25);
+  --shadow-card: 0 10px 28px -12px rgba(34, 28, 74, 0.12);
+  --editor-bg: #ffffff;
+}
+
+[data-ui-theme='solarized-light'] {
+  --bg-canvas: #eee8d5;
+  --bg-panel: #fdf6e3;
+  --bg-panel-alt: #f4edd6;
+  --bg-elevated: #eae1c5;
+  --bg-hover: #dfd5b6;
+  --bg-active: rgba(217, 119, 6, 0.16);
+  --text-primary: #2c3539;
+  --text-secondary: #657b83;
+  --accent-primary: #d97706;
+  --accent-secondary: #f59e0b;
+  --accent-glow: rgba(217, 119, 6, 0.26);
+  --shadow-card: 0 10px 26px -12px rgba(88, 74, 38, 0.14);
+  --editor-bg: #fdf6e3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overscroll-behavior: none;
+}
+
+#root {
+  background-color: var(--bg-canvas);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.ide-card {
+  background-color: var(--bg-panel);
+  border: none !important;
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  transition:
+    background-color 0.25s ease,
+    border-radius 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+[data-ui-density='compact'] .ide-card {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.accent-btn {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 6px 18px -4px var(--accent-glow);
+}
+
+.accent-pill-active {
+  background-color: var(--accent-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 4px 14px -3px var(--accent-glow);
+}
+
+.btn-lift {
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.btn-lift:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px var(--accent-glow);
+}
+
+.btn-lift:active:not(:disabled) {
+  transform: translateY(0px) scale(0.97);
+}
+
+.tab-pill {
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tab-pill:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes tabContentFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tab-content-enter {
+  animation: tabContentFadeSlide 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* =====================================================================
+   HIỆU ỨNG GÕ CODE MƯỢT MÀ + LÓE SÁNG KÝ TỰ & POPUP GỢI Ý NỔI TRÊN CÙNG
+   ===================================================================== */
+
+.monaco-editor,
+.monaco-editor-background,
+.monaco-editor .margin {
+  background-color: var(--editor-bg) !important;
+  transition: background-color 0.25s ease;
+}
+
+.monaco-editor .cursors-layer .cursor {
+  border-radius: 2px !important;
+  box-shadow: 0 0 10px var(--accent-primary), 0 0 4px var(--accent-glow);
+}
+
+.monaco-editor .view-overlays .current-line {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+@keyframes codeCharTypedGlow {
+  0% {
+    background-color: var(--bg-active);
+    text-shadow: 0 0 12px var(--accent-primary), 0 0 5px var(--accent-secondary);
+    border-radius: 4px;
+  }
+  55% {
+    background-color: rgba(124, 92, 255, 0.08);
+    text-shadow: 0 0 6px var(--accent-glow);
+  }
+  100% {
+    background-color: transparent;
+    text-shadow: none;
+  }
+}
+
+.code-char-typed-glow {
+  animation: codeCharTypedGlow 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes suggestWidgetAppear {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.monaco-editor .suggest-widget,
+.monaco-editor .parameter-hints-widget {
+  z-index: 9999 !important;
+  border-radius: 12px !important;
+  border: none !important;
+  box-shadow: 0 14px 32px -8px rgba(0, 0, 0, 0.45) !important;
+  animation: suggestWidgetAppear 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.monaco-editor .bracket-match {
+  border-radius: 4px;
+}
+
+/* =====================================================================
+   LÀM SẠCH EXPLORER: BỎ KHUNG HỘP TỪNG DÒNG & BỎ THANH NỀN ĐEN DƯỚI ĐÁY
+   ===================================================================== */
+
+.explorer-clean,
+.explorer-clean > div {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.explorer-clean [class*='bg-'],
+.explorer-clean [class*='border'] {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.explorer-clean [class*='hover:bg-']:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+.explorer-clean [class~='bg-[#37373D]'],
+.explorer-clean [class~='bg-[#094771]'],
+.explorer-clean [class~='bg-[#04395E]'],
+.explorer-clean [class~='bg-[#264F78]'],
+.explorer-clean [class~='bg-[#2A2D2E]'],
+.explorer-clean [class~='bg-[#262629]'],
+.explorer-clean [class~='bg-[#27272A]'],
+.explorer-clean [class~='bg-[#232326]'],
+.explorer-clean [class~='bg-[#1F1F23]'],
+.explorer-clean [class~='bg-[#2C2C2E]'],
+.explorer-clean [class~='bg-[#323236]'],
+.explorer-clean [aria-selected='true'] {
+  background-color: var(--bg-active) !important;
+  color: var(--accent-primary) !important;
+  font-weight: 600 !important;
+}
+
+.explorer-clean button {
+  background-color: transparent !important;
+  color: var(--text-secondary) !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 10px !important;
+}
+
+.explorer-clean button:hover:not(:disabled) {
+  background-color: var(--bg-hover) !important;
+  color: var(--accent-primary) !important;
+  transform: translateY(-1px);
+}
+
+.explorer-clean button svg {
+  color: inherit !important;
+}
+
+/* =====================================================================
+   ĐỒNG BỘ CÁC COMPONENT CON KHÁC (TERMINAL, INPUT, SEARCH, MODAL)
+   ===================================================================== */
+
+.theme-scope [class~='bg-[#1E1E1E]'],
+.theme-scope [class~='bg-[#181818]'],
+.theme-scope [class~='bg-[#141414]'],
+.theme-scope [class~='bg-[#161616]'],
+.theme-scope [class~='bg-[#191919]'],
+.theme-scope [class~='bg-[#1A1A1A]'],
+.theme-scope [class~='bg-[#1B1B1B]'],
+.theme-scope [class~='bg-[#1C1C1C]'],
+.theme-scope [class~='bg-[#1D1D1D]'],
+.theme-scope [class~='bg-[#1F1F1F]'],
+.theme-scope [class~='bg-[#111111]'],
+.theme-scope [class~='bg-[#121212]'],
+.theme-scope [class~='bg-[#0D0D0D]'],
+.theme-scope [class~='bg-[#0F0F0F]'],
+.theme-scope .bg-black {
+  background-color: var(--bg-panel) !important;
+}
+
+.theme-scope [class~='bg-[#252526]'],
+.theme-scope [class~='bg-[#202020]'],
+.theme-scope [class~='bg-[#212121]'],
+.theme-scope [class~='bg-[#222222]'],
+.theme-scope [class~='bg-[#242424]'],
+.theme-scope [class~='bg-[#262626]'],
+.theme-scope [class~='bg-[#282828]'],
+.theme-scope [class~='bg-[#2D2D2D]'],
+.theme-scope [class~='bg-[#333333]'],
+.theme-scope [class~='bg-[#383838]'],
+.theme-scope [class~='bg-[#262629]'],
+.theme-scope [class~='bg-[#27272A]'] {
+  background-color: var(--bg-panel-alt) !important;
+}
+
+.theme-scope [class~='bg-[#2A2D2E]'],
+.theme-scope [class~='bg-[#37373D]'],
+.theme-scope [class~='bg-[#094771]'],
+.theme-scope [class~='bg-[#04395E]'],
+.theme-scope [class~='bg-[#264F78]'] {
+  background-color: var(--bg-active) !important;
+}
+
+.theme-scope [class*='border'] {
+  border-color: transparent !important;
+}
+
+.theme-scope [class*='text-[#CCCCCC]'],
+.theme-scope [class*='text-[#D4D4D4]'],
+.theme-scope [class*='text-[#E0E0E0]'],
+.theme-scope [class*='text-[#E5E5E5]'],
+.theme-scope [class*='text-[#F3F3F3]'],
+.theme-scope [class*='text-gray-200'],
+.theme-scope [class*='text-gray-300'],
+.theme-scope [class*='text-zinc-200'],
+.theme-scope [class*='text-zinc-300'],
+.theme-scope [class*='text-white'] {
+  color: var(--text-primary) !important;
+}
+
+.theme-scope [class*='text-[#858585]'],
+.theme-scope [class*='text-[#9E9E9E]'],
+.theme-scope [class*='text-[#A0A0A0]'],
+.theme-scope [class*='text-gray-400'],
+.theme-scope [class*='text-zinc-400'] {
+  color: var(--text-secondary) !important;
+}
+
+.theme-scope:not(.explorer-clean) [class~='bg-[#007ACC]'],
+.theme-scope:not(.explorer-clean) [class~='bg-[#7C5CFF]'] {
+  background-color: var(--accent-primary) !important;
+  color: #ffffff !important;
+  border-radius: 11px !important;
+}
+
+.theme-scope:not(.explorer-clean) [class~='bg-[#007ACC]'] *,
+.theme-scope:not(.explorer-clean) [class~='bg-[#7C5CFF]'] *,
+.theme-scope [class*='bg-rose-'] *,
+.theme-scope [class*='bg-emerald-6'] * {
+  color: #ffffff !important;
+}
+
+.theme-scope textarea,
+.theme-scope input:not([type='checkbox']):not([type='radio']),
+.theme-scope select {
+  background-color: var(--bg-panel-alt) !important;
+  color: var(--text-primary) !important;
+  border: none !important;
+  border-radius: 12px !important;
+}
+
+.status-bar-wrap [class*='bg-[#007ACC]'] {
+  background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%) !important;
+}
+
+.status-bar-wrap,
+.status-bar-wrap * {
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.theme-scope button {
+  border-radius: 11px;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.theme-scope button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-glow);
+  border-radius: 9999px;
+}

@@ -1,0 +1,120 @@
+name: Build LocalCode IDE (iPadOS / iOS IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-ipa:
+    name: Build Unsigned IPA for iPad & iPhone
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install & Build Web Client
+        run: |
+          npm --prefix client install
+          npm --prefix client run build
+
+      - name: Setup Capacitor iOS Project
+        run: |
+          npm install --no-save @capacitor/core@6 @capacitor/cli@6 @capacitor/ios@6
+          rm -rf ios
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Apply App Icon for iPad & iPhone
+        run: |
+          ICON_SRC="client/public/icon-512.png"
+          ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+          if [ -f "$ICON_SRC" ] && [ -d "$ICON_DIR" ]; then
+            rm -f "$ICON_DIR"/*.png
+            sips -s format png -z 1024 1024 "$ICON_SRC" --out "$ICON_DIR/AppIcon-1024.png"
+            cat << 'EOF' > "$ICON_DIR/Contents.json"
+          {
+            "images": [
+              {
+                "filename": "AppIcon-1024.png",
+                "idiom": "universal",
+                "platform": "ios",
+                "size": "1024x1024"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          EOF
+          fi
+
+      - name: Configure iPadOS Info.plist (Split View, Files App, Status Bar)
+        run: |
+          PLIST="ios/App/App/Info.plist"
+          plutil -replace CFBundleDisplayName -string "LocalCode IDE" "$PLIST"
+          plutil -replace UIFileSharingEnabled -bool true "$PLIST"
+          plutil -replace LSSupportsOpeningDocumentsInPlace -bool true "$PLIST"
+          plutil -replace UIRequiresFullScreen -bool false "$PLIST"
+          plutil -replace UIStatusBarStyle -string "UIStatusBarStyleLightContent" "$PLIST"
+          plutil -replace UIViewControllerBasedStatusBarAppearance -bool false "$PLIST"
+
+      - name: Build Unsigned iOS/iPadOS App Bundle
+        run: |
+          cd ios/App
+          if [ -d "App.xcworkspace" ]; then
+            xcodebuild \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -configuration Release \
+              -sdk iphoneos \
+              -derivedDataPath build \
+              TARGETED_DEVICE_FAMILY="1,2" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM="" \
+              build
+          else
+            xcodebuild \
+              -project App.xcodeproj \
+              -scheme App \
+              -configuration Release \
+              -sdk iphoneos \
+              -derivedDataPath build \
+              TARGETED_DEVICE_FAMILY="1,2" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM="" \
+              build
+          fi
+
+      - name: Package .ipa
+        run: |
+          APP_PATH="ios/App/build/Build/Products/Release-iphoneos/App.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "App.app not found at $APP_PATH"
+            exit 1
+          fi
+          rm -rf Payload LocalCode-IDE-iPad.ipa
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -qry LocalCode-IDE-iPad.ipa Payload
+          ls -lh LocalCode-IDE-iPad.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalCode-IDE-iPad-IPA
+          path: LocalCode-IDE-iPad.ipa
+          retention-days: 30
