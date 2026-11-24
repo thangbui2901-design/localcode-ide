@@ -10,7 +10,7 @@ interface MobileNavProps {
   problemCount: number;
 }
 
-export const MobileNav: React.FC<MobileNavProps> = ({
+export const MobileNav: React.FC<MobileNavProps> = React.memo(({
   activeTab,
   onSelectTab,
   onGoHome,
@@ -68,7 +68,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
           boxShadow:
             '0 14px 36px -8px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.14)'
         }}
-        className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-2xl"
+        className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-lg"
       >
         <div className="relative flex items-center">
           {/* Viên thuốc trượt bo tròn mượt bên trong giống thanh bar iOS/Messenger */}
@@ -127,4 +127,4 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       </div>
     </nav>
   );
-};
+});

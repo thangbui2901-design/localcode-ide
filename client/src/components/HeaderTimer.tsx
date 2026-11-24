@@ -46,7 +46,7 @@ interface HeaderTimerProps {
   align?: 'left' | 'right';
 }
 
-export const HeaderTimer: React.FC<HeaderTimerProps> = ({ align = 'right' }) => {
+export const HeaderTimer: React.FC<HeaderTimerProps> = React.memo(({ align = 'right' }) => {
   const [mode, setMode] = useState<TimerMode>(() => {
     const saved = localStorage.getItem('codeide_timer_mode');
     return saved === 'stopwatch' ? 'stopwatch' : 'countdown';
@@ -354,4 +354,4 @@ export const HeaderTimer: React.FC<HeaderTimerProps> = ({ align = 'right' }) => 
       )}
     </div>
   );
-};
+});

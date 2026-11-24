@@ -75,7 +75,7 @@ export const KeyboardShortcutsHud: React.FC<KeyboardShortcutsHudProps> = ({
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.26s var(--ease-ios-out)'
       }}
-      className={`fixed inset-0 z-50 bg-black/45 backdrop-blur-md flex items-center justify-center p-4 ${
+      className={`fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4 ${
         visible ? '' : 'pointer-events-none'
       }`}
       onClick={onClose}
@@ -90,13 +90,12 @@ export const KeyboardShortcutsHud: React.FC<KeyboardShortcutsHudProps> = ({
           opacity: visible ? 1 : 0,
           transform: visible
             ? 'translate3d(0, 0, 0) scale(1)'
-            : 'translate3d(0, 18px, 0) scale(0.92)',
-          filter: visible ? 'blur(0px)' : 'blur(8px)',
+            : 'translate3d(0, 18px, 0) scale(0.93)',
+          filter: visible ? 'blur(0px)' : 'blur(3px)',
           transition:
-            'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.28s ease',
-          willChange: 'transform, opacity, filter'
+            'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.24s ease'
         }}
-        className="w-full max-w-4xl rounded-3xl p-5 sm:p-6 backdrop-blur-2xl"
+        className="w-full max-w-4xl rounded-3xl p-5 sm:p-6 backdrop-blur-lg"
       >
         <div className="flex items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-2.5">

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
 import { FileTypeIcon } from './components/FileTypeIcon';
 import {
@@ -62,24 +62,42 @@ import { SearchSidebar } from './components/SearchSidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { BottomPanel, TerminalChunk } from './components/BottomPanel';
 import { StatusBar } from './components/StatusBar';
-import { SettingsModal } from './components/SettingsModal';
 import { MobileCodingToolbar } from './components/MobileCodingToolbar';
 import { MobileNav, MobileTab } from './components/MobileNav';
 import { HeaderTimer } from './components/HeaderTimer';
 import { FloatingToast, ToastItem, ToastTone } from './components/FloatingToast';
-import { WebPreviewPane } from './components/WebPreviewPane';
 import { HomeScreen, NewProjectTemplate, QuickStartKind } from './components/HomeScreen';
 import { CommandPalette, PaletteCommand, PaletteIcons } from './components/CommandPalette';
 import { SplashScreen } from './components/SplashScreen';
-import { PencilScratchpad } from './components/ipad/PencilScratchpad';
-import { ProblemNotesPane } from './components/ipad/ProblemNotesPane';
 import { OutlinePanel, extractOutlineSymbols } from './components/ipad/OutlinePanel';
-import { DiffViewerModal } from './components/ipad/DiffViewerModal';
-import { VirtualTrackpad } from './components/ipad/VirtualTrackpad';
-import { KeyboardShortcutsHud } from './components/ipad/KeyboardShortcutsHud';
 import { DropZoneOverlay } from './components/ipad/DropZoneOverlay';
 import { LeftActivityPill } from './components/ipad/LeftActivityPill';
 import { IpadRightTool } from './components/ipad/IpadFloatingDock';
+
+// Tải lười (Code-Splitting) các panel/modal phụ để khởi động nhẹ & tiết kiệm RAM trên iOS/iPadOS
+const SettingsModal = lazy(() =>
+  import('./components/SettingsModal').then((m) => ({ default: m.SettingsModal }))
+);
+const WebPreviewPane = lazy(() =>
+  import('./components/WebPreviewPane').then((m) => ({ default: m.WebPreviewPane }))
+);
+const PencilScratchpad = lazy(() =>
+  import('./components/ipad/PencilScratchpad').then((m) => ({ default: m.PencilScratchpad }))
+);
+const ProblemNotesPane = lazy(() =>
+  import('./components/ipad/ProblemNotesPane').then((m) => ({ default: m.ProblemNotesPane }))
+);
+const DiffViewerModal = lazy(() =>
+  import('./components/ipad/DiffViewerModal').then((m) => ({ default: m.DiffViewerModal }))
+);
+const VirtualTrackpad = lazy(() =>
+  import('./components/ipad/VirtualTrackpad').then((m) => ({ default: m.VirtualTrackpad }))
+);
+const KeyboardShortcutsHud = lazy(() =>
+  import('./components/ipad/KeyboardShortcutsHud').then((m) => ({
+    default: m.KeyboardShortcutsHud
+  }))
+);
 import { downloadZipArchive } from './utils/zipExporter';
 import {
   ACCENT_PRESETS,
@@ -227,6 +245,14 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+function useMountOnce(active: boolean): boolean {
+  const [mounted, setMounted] = useState(active);
+  useEffect(() => {
+    if (active && !mounted) setMounted(true);
+  }, [active, mounted]);
+  return mounted;
 }
 
 export default function App() {
@@ -390,18 +416,7 @@ export default function App() {
       );
     });
 
-    const poll = window.setInterval(() => {
-      syncAllMonaco();
-      if ((window as any).monaco && primaryEditorRef.current) {
-        window.clearInterval(poll);
-      }
-    }, 200);
-
-    const stopPoll = window.setTimeout(() => window.clearInterval(poll), 12000);
-
     return () => {
-      window.clearInterval(poll);
-      window.clearTimeout(stopPoll);
       disposables.forEach((d) => d.dispose());
     };
   }, [uiTheme, activeAccentOverride]);
@@ -515,6 +530,11 @@ export default function App() {
   const [trackpadOpen, setTrackpadOpen] = useState(false);
   const [shortcutsHudOpen, setShortcutsHudOpen] = useState(false);
   const [shortcutsHudHoldMode, setShortcutsHudHoldMode] = useState(false);
+  const diffMounted = useMountOnce(diffOpen);
+  const trackpadMounted = useMountOnce(trackpadOpen);
+  const shortcutsHudMounted = useMountOnce(shortcutsHudOpen);
+  const scratchpadMounted = useMountOnce(ipadRightTool === 'scratchpad');
+  const notesMounted = useMountOnce(ipadRightTool === 'notes');
   const [isDragOverWorkspace, setIsDragOverWorkspace] = useState(false);
   const [requestedConsoleTab, setRequestedConsoleTab] = useState<{
     tab: 'terminal' | 'input' | 'tests' | 'problems';
@@ -2909,33 +2929,37 @@ export default function App() {
 
         {renderCommandPalette}
 
-        <SettingsModal
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          mode={mode}
-          onChangeMode={handleSwitchMode}
-          editorSettings={editorSettings}
-          onUpdateEditor={setEditorSettings}
-          compilerSettings={compilerSettings}
-          onUpdateCompiler={handleUpdateCompiler}
-          onExportBackup={handleExportBackup}
-          onImportBackup={handleImportBackup}
-          uiTheme={uiTheme}
-          onChangeUiTheme={handleChangeUiTheme}
-          uiDensity={uiDensity}
-          onChangeUiDensity={setUiDensity}
-          typingSound={typingSound}
-          onChangeTypingSound={setTypingSound}
-          hapticsEnabled={hapticsEnabled}
-          onChangeHapticsEnabled={handleChangeHapticsEnabled}
-          onSyncDeviceFiles={handleSyncDeviceFiles}
-          isSyncingFiles={isSyncingFiles}
-          onPreloadOfflineCpp={handlePreloadOfflineCpp}
-          offlineCppState={offlineCppState}
-          offlineCppPercent={offlineCppPercent}
-          visualPrefs={visualPrefs}
-          onUpdateVisualPrefs={handleUpdateVisualPrefs}
-        />
+        {settingsOpen && (
+          <Suspense fallback={null}>
+            <SettingsModal
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              mode={mode}
+              onChangeMode={handleSwitchMode}
+              editorSettings={editorSettings}
+              onUpdateEditor={setEditorSettings}
+              compilerSettings={compilerSettings}
+              onUpdateCompiler={handleUpdateCompiler}
+              onExportBackup={handleExportBackup}
+              onImportBackup={handleImportBackup}
+              uiTheme={uiTheme}
+              onChangeUiTheme={handleChangeUiTheme}
+              uiDensity={uiDensity}
+              onChangeUiDensity={setUiDensity}
+              typingSound={typingSound}
+              onChangeTypingSound={setTypingSound}
+              hapticsEnabled={hapticsEnabled}
+              onChangeHapticsEnabled={handleChangeHapticsEnabled}
+              onSyncDeviceFiles={handleSyncDeviceFiles}
+              isSyncingFiles={isSyncingFiles}
+              onPreloadOfflineCpp={handlePreloadOfflineCpp}
+              offlineCppState={offlineCppState}
+              offlineCppPercent={offlineCppPercent}
+              visualPrefs={visualPrefs}
+              onUpdateVisualPrefs={handleUpdateVisualPrefs}
+            />
+          </Suspense>
+        )}
 
         <FloatingToast
           toast={toast}
@@ -3096,17 +3120,19 @@ export default function App() {
             }`}
           >
             {livePreviewOpen ? (
-              <WebPreviewPane
-                files={liveFiles}
-                activeFile={primaryFile}
-                selectedHtmlPath={previewHtmlPath}
-                revision={liveRevision}
-                onSelectHtmlPath={setPreviewHtmlPath}
-                onImportAssets={handleImportAssets}
-                onConsoleMessage={handlePreviewConsole}
-                onExportSuccess={(name) => showToast(`Đã xuất tệp ${name} độc lập`, 'success')}
-                onClose={() => setLivePreviewOpen(false)}
-              />
+              <Suspense fallback={null}>
+                <WebPreviewPane
+                  files={liveFiles}
+                  activeFile={primaryFile}
+                  selectedHtmlPath={previewHtmlPath}
+                  revision={liveRevision}
+                  onSelectHtmlPath={setPreviewHtmlPath}
+                  onImportAssets={handleImportAssets}
+                  onConsoleMessage={handlePreviewConsole}
+                  onExportSuccess={(name) => showToast(`Đã xuất tệp ${name} độc lập`, 'success')}
+                  onClose={() => setLivePreviewOpen(false)}
+                />
+              </Suspense>
             ) : (
               <>
                 <CodeEditor
@@ -3221,33 +3247,37 @@ export default function App() {
           )}
         </div>
 
-        <SettingsModal
-          open={mobileTab === 'settings'}
-          onClose={() => setMobileTab('editor')}
-          mode={mode}
-          onChangeMode={handleSwitchMode}
-          editorSettings={editorSettings}
-          onUpdateEditor={setEditorSettings}
-          compilerSettings={compilerSettings}
-          onUpdateCompiler={handleUpdateCompiler}
-          onExportBackup={handleExportBackup}
-          onImportBackup={handleImportBackup}
-          uiTheme={uiTheme}
-          onChangeUiTheme={handleChangeUiTheme}
-          uiDensity={uiDensity}
-          onChangeUiDensity={setUiDensity}
-          typingSound={typingSound}
-          onChangeTypingSound={setTypingSound}
-          hapticsEnabled={hapticsEnabled}
-          onChangeHapticsEnabled={handleChangeHapticsEnabled}
-          onSyncDeviceFiles={handleSyncDeviceFiles}
-          isSyncingFiles={isSyncingFiles}
-          onPreloadOfflineCpp={handlePreloadOfflineCpp}
-          offlineCppState={offlineCppState}
-          offlineCppPercent={offlineCppPercent}
-          visualPrefs={visualPrefs}
-          onUpdateVisualPrefs={handleUpdateVisualPrefs}
-        />
+        {mobileTab === 'settings' && (
+          <Suspense fallback={null}>
+            <SettingsModal
+              open={mobileTab === 'settings'}
+              onClose={() => setMobileTab('editor')}
+              mode={mode}
+              onChangeMode={handleSwitchMode}
+              editorSettings={editorSettings}
+              onUpdateEditor={setEditorSettings}
+              compilerSettings={compilerSettings}
+              onUpdateCompiler={handleUpdateCompiler}
+              onExportBackup={handleExportBackup}
+              onImportBackup={handleImportBackup}
+              uiTheme={uiTheme}
+              onChangeUiTheme={handleChangeUiTheme}
+              uiDensity={uiDensity}
+              onChangeUiDensity={setUiDensity}
+              typingSound={typingSound}
+              onChangeTypingSound={setTypingSound}
+              hapticsEnabled={hapticsEnabled}
+              onChangeHapticsEnabled={handleChangeHapticsEnabled}
+              onSyncDeviceFiles={handleSyncDeviceFiles}
+              isSyncingFiles={isSyncingFiles}
+              onPreloadOfflineCpp={handlePreloadOfflineCpp}
+              offlineCppState={offlineCppState}
+              offlineCppPercent={offlineCppPercent}
+              visualPrefs={visualPrefs}
+              onUpdateVisualPrefs={handleUpdateVisualPrefs}
+            />
+          </Suspense>
+        )}
 
         {renderCommandPalette}
 
@@ -3632,13 +3662,12 @@ export default function App() {
                 opacity: sidebarView ? 1 : 0,
                 transform: sidebarView
                   ? 'translate3d(0, 0, 0) scale(1)'
-                  : 'translate3d(-22px, 0, 0) scale(0.95)',
-                filter: sidebarView ? 'blur(0px)' : 'blur(6px)',
+                  : 'translate3d(-22px, 0, 0) scale(0.96)',
+                filter: sidebarView ? 'blur(0px)' : 'blur(3px)',
                 transformOrigin: 'left center',
                 transition: isResizingSidebar
                   ? 'none'
-                  : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease, filter 0.32s ease',
-                willChange: 'transform, opacity, filter'
+                  : 'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.26s ease'
               }}
               className="shrink-0 h-full ide-card flex flex-col overflow-hidden"
             >
@@ -3882,17 +3911,19 @@ export default function App() {
                   style={{ borderColor: 'var(--bg-elevated)' }}
                   className="flex-1 min-w-0 min-h-0 flex flex-col border-t md:border-t-0 md:border-l"
                 >
-                  <WebPreviewPane
-                    files={liveFiles}
-                    activeFile={primaryFile}
-                    selectedHtmlPath={previewHtmlPath}
-                    revision={liveRevision}
-                    onSelectHtmlPath={setPreviewHtmlPath}
-                    onImportAssets={handleImportAssets}
-                    onConsoleMessage={handlePreviewConsole}
-                    onExportSuccess={(name) => showToast(`Đã xuất tệp ${name} độc lập`, 'success')}
-                    onClose={() => setLivePreviewOpen(false)}
-                  />
+                  <Suspense fallback={null}>
+                    <WebPreviewPane
+                      files={liveFiles}
+                      activeFile={primaryFile}
+                      selectedHtmlPath={previewHtmlPath}
+                      revision={liveRevision}
+                      onSelectHtmlPath={setPreviewHtmlPath}
+                      onImportAssets={handleImportAssets}
+                      onConsoleMessage={handlePreviewConsole}
+                      onExportSuccess={(name) => showToast(`Đã xuất tệp ${name} độc lập`, 'success')}
+                      onClose={() => setLivePreviewOpen(false)}
+                    />
+                  </Suspense>
                 </div>
               )}
 
@@ -4019,12 +4050,11 @@ export default function App() {
                     bottomOpen && consoleDock === 'bottom'
                       ? 'translate3d(0, 0, 0) scale(1)'
                       : 'translate3d(0, 20px, 0) scale(0.96)',
-                  filter: bottomOpen && consoleDock === 'bottom' ? 'blur(0px)' : 'blur(6px)',
+                  filter: bottomOpen && consoleDock === 'bottom' ? 'blur(0px)' : 'blur(3px)',
                   transformOrigin: 'center bottom',
                   transition: isResizingBottom
                     ? 'none'
-                    : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease, filter 0.3s ease',
-                  willChange: 'transform, opacity, filter'
+                    : 'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.26s ease'
                 }}
                 className="w-full ide-card flex flex-col overflow-hidden relative"
               >
@@ -4116,13 +4146,12 @@ export default function App() {
                 opacity: showRightPanel ? 1 : 0,
                 transform: showRightPanel
                   ? 'translate3d(0, 0, 0) scale(1)'
-                  : 'translate3d(24px, 0, 0) scale(0.95)',
-                filter: showRightPanel ? 'blur(0px)' : 'blur(6px)',
+                  : 'translate3d(24px, 0, 0) scale(0.96)',
+                filter: showRightPanel ? 'blur(0px)' : 'blur(3px)',
                 transformOrigin: 'right center',
                 transition: isResizingRightPanel
                   ? 'none'
-                  : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease, filter 0.3s ease',
-                willChange: 'transform, opacity, filter'
+                  : 'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.26s ease'
               }}
               className="shrink-0 h-full ide-card flex flex-col overflow-hidden"
             >
@@ -4131,17 +4160,25 @@ export default function App() {
                 className="flex-1 min-h-0 flex flex-col overflow-hidden right-panel-swap"
               >
                 {renderedRightKind === 'scratchpad' ? (
-                  <PencilScratchpad
-                    projectKey={projectKey}
-                    onClose={() => setIpadRightTool(null)}
-                    onExportToast={(msg) => showToast(msg, 'success')}
-                  />
+                  scratchpadMounted ? (
+                    <Suspense fallback={null}>
+                      <PencilScratchpad
+                        projectKey={projectKey}
+                        onClose={() => setIpadRightTool(null)}
+                        onExportToast={(msg) => showToast(msg, 'success')}
+                      />
+                    </Suspense>
+                  ) : null
                 ) : renderedRightKind === 'notes' ? (
-                  <ProblemNotesPane
-                    projectKey={projectKey}
-                    onSendSampleToTests={handleSendSampleToTests}
-                    onClose={() => setIpadRightTool(null)}
-                  />
+                  notesMounted ? (
+                    <Suspense fallback={null}>
+                      <ProblemNotesPane
+                        projectKey={projectKey}
+                        onSendSampleToTests={handleSendSampleToTests}
+                        onClose={() => setIpadRightTool(null)}
+                      />
+                    </Suspense>
+                  ) : null
                 ) : (
                   <BottomPanel
                     mode={mode}
@@ -4231,11 +4268,10 @@ export default function App() {
               opacity: tabletDrawerVisible ? 1 : 0,
               transform: tabletDrawerVisible
                 ? 'translate3d(0, 0, 0) scale(1)'
-                : 'translate3d(-104%, 0, 0) scale(0.95)',
-              filter: tabletDrawerVisible ? 'blur(0px)' : 'blur(4px)',
+                : 'translate3d(-104%, 0, 0) scale(0.96)',
+              filter: tabletDrawerVisible ? 'blur(0px)' : 'blur(3px)',
               transition:
-                'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease, filter 0.3s ease',
-              willChange: 'transform, opacity, filter'
+                'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.26s ease'
             }}
             className="h-full w-80 max-w-[85vw] ide-card flex flex-col overflow-hidden"
           >
@@ -4393,67 +4429,83 @@ export default function App() {
       )}
 
       {/* IPAD VIRTUAL TRACKPAD OVERLAY */}
-      <VirtualTrackpad
-        open={trackpadOpen}
-        onMoveCursor={handleTrackpadMove}
-        onSelectLine={handleTrackpadSelectLine}
-        onSelectBlock={handleTrackpadSelectBlock}
-        onJumpLineEdge={handleTrackpadJumpEdge}
-        onClose={() => setTrackpadOpen(false)}
-      />
+      {trackpadMounted && (
+        <Suspense fallback={null}>
+          <VirtualTrackpad
+            open={trackpadOpen}
+            onMoveCursor={handleTrackpadMove}
+            onSelectLine={handleTrackpadSelectLine}
+            onSelectBlock={handleTrackpadSelectBlock}
+            onJumpLineEdge={handleTrackpadJumpEdge}
+            onClose={() => setTrackpadOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* SIDE-BY-SIDE DIFF VIEWER MODAL */}
-      <DiffViewerModal
-        open={diffOpen}
-        files={liveFiles}
-        activeFile={activeFile}
-        snapshots={fileSnapshots}
-        monacoTheme={currentThemeObj.monacoTheme}
-        fontSize={editorSettings.fontSize}
-        onSaveSnapshot={handleSaveDiffSnapshot}
-        onClose={() => setDiffOpen(false)}
-      />
+      {diffMounted && (
+        <Suspense fallback={null}>
+          <DiffViewerModal
+            open={diffOpen}
+            files={liveFiles}
+            activeFile={activeFile}
+            snapshots={fileSnapshots}
+            monacoTheme={currentThemeObj.monacoTheme}
+            fontSize={editorSettings.fontSize}
+            onSaveSnapshot={handleSaveDiffSnapshot}
+            onClose={() => setDiffOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* MAGIC KEYBOARD HOLD-⌘ SHORTCUTS HUD */}
-      <KeyboardShortcutsHud
-        open={shortcutsHudOpen}
-        isHoldMode={shortcutsHudHoldMode}
-        onClose={() => {
-          setShortcutsHudOpen(false);
-          setShortcutsHudHoldMode(false);
-        }}
-      />
+      {shortcutsHudMounted && (
+        <Suspense fallback={null}>
+          <KeyboardShortcutsHud
+            open={shortcutsHudOpen}
+            isHoldMode={shortcutsHudHoldMode}
+            onClose={() => {
+              setShortcutsHudOpen(false);
+              setShortcutsHudHoldMode(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* IPADOS SPLIT VIEW DRAG & DROP OVERLAY */}
       <DropZoneOverlay visible={isDragOverWorkspace} />
 
-      <SettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        mode={mode}
-        onChangeMode={handleSwitchMode}
-        editorSettings={editorSettings}
-        onUpdateEditor={setEditorSettings}
-        compilerSettings={compilerSettings}
-        onUpdateCompiler={handleUpdateCompiler}
-        onExportBackup={handleExportBackup}
-        onImportBackup={handleImportBackup}
-        uiTheme={uiTheme}
-        onChangeUiTheme={handleChangeUiTheme}
-        uiDensity={uiDensity}
-        onChangeUiDensity={setUiDensity}
-        typingSound={typingSound}
-        onChangeTypingSound={setTypingSound}
-        hapticsEnabled={hapticsEnabled}
-        onChangeHapticsEnabled={handleChangeHapticsEnabled}
-        onSyncDeviceFiles={handleSyncDeviceFiles}
-        isSyncingFiles={isSyncingFiles}
-        onPreloadOfflineCpp={handlePreloadOfflineCpp}
-        offlineCppState={offlineCppState}
-        offlineCppPercent={offlineCppPercent}
-        visualPrefs={visualPrefs}
-        onUpdateVisualPrefs={handleUpdateVisualPrefs}
-      />
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            mode={mode}
+            onChangeMode={handleSwitchMode}
+            editorSettings={editorSettings}
+            onUpdateEditor={setEditorSettings}
+            compilerSettings={compilerSettings}
+            onUpdateCompiler={handleUpdateCompiler}
+            onExportBackup={handleExportBackup}
+            onImportBackup={handleImportBackup}
+            uiTheme={uiTheme}
+            onChangeUiTheme={handleChangeUiTheme}
+            uiDensity={uiDensity}
+            onChangeUiDensity={setUiDensity}
+            typingSound={typingSound}
+            onChangeTypingSound={setTypingSound}
+            hapticsEnabled={hapticsEnabled}
+            onChangeHapticsEnabled={handleChangeHapticsEnabled}
+            onSyncDeviceFiles={handleSyncDeviceFiles}
+            isSyncingFiles={isSyncingFiles}
+            onPreloadOfflineCpp={handlePreloadOfflineCpp}
+            offlineCppState={offlineCppState}
+            offlineCppPercent={offlineCppPercent}
+            visualPrefs={visualPrefs}
+            onUpdateVisualPrefs={handleUpdateVisualPrefs}
+          />
+        </Suspense>
+      )}
 
       {renderCommandPalette}
 

@@ -192,7 +192,7 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
         paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
         paddingLeft: 'max(12px, env(safe-area-inset-left))'
       }}
-      className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center ${
+      className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center ${
         visible ? '' : 'pointer-events-none'
       }`}
       onClick={onClose}
@@ -207,11 +207,10 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
           opacity: visible ? 1 : 0,
           transform: visible
             ? 'translate3d(0, 0, 0) scale(1)'
-            : 'translate3d(0, 20px, 0) scale(0.93)',
-          filter: visible ? 'blur(0px)' : 'blur(8px)',
+            : 'translate3d(0, 20px, 0) scale(0.94)',
+          filter: visible ? 'blur(0px)' : 'blur(3px)',
           transition:
-            'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.28s ease',
-          willChange: 'transform, opacity, filter'
+            'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.24s ease'
         }}
         className="w-full max-w-6xl h-[86vh] rounded-3xl overflow-hidden flex flex-col"
       >

@@ -62,13 +62,18 @@ function ensureMonacoWebAndCppSupport() {
   }
 
   try {
-    monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-      target: monaco.languages.typescript.ScriptTarget.ES2020,
-      allowNonTsExtensions: true,
-      allowJs: true,
-      checkJs: false
-    });
-    monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
+    const tsLang = (monaco.languages as unknown as {
+      typescript?: typeof monaco.languages.typescript;
+    }).typescript;
+    if (tsLang?.javascriptDefaults) {
+      tsLang.javascriptDefaults.setCompilerOptions({
+        target: tsLang.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+        allowJs: true,
+        checkJs: false
+      });
+      tsLang.javascriptDefaults.setEagerModelSync(true);
+    }
   } catch {
     // Bỏ qua nếu worker chưa sẵn sàng
   }

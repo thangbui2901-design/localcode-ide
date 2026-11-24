@@ -136,15 +136,14 @@ export const VirtualTrackpad: React.FC<VirtualTrackpadProps> = ({
         opacity: visible ? 1 : 0,
         transform: visible
           ? 'translate3d(0, 0, 0) scale(1)'
-          : 'translate3d(0, 20px, 0) scale(0.86)',
-        filter: visible ? 'blur(0px)' : 'blur(6px)',
+          : 'translate3d(0, 20px, 0) scale(0.88)',
+        filter: visible ? 'blur(0px)' : 'blur(3px)',
         transformOrigin: 'bottom right',
         transition: isDraggingWin
           ? 'none'
-          : 'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.28s ease',
-        willChange: 'transform, opacity, filter'
+          : 'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.24s ease'
       }}
-      className={`fixed z-40 w-60 rounded-2xl backdrop-blur-2xl overflow-hidden select-none ${
+      className={`fixed z-40 w-60 rounded-2xl backdrop-blur-lg overflow-hidden select-none ${
         visible ? '' : 'pointer-events-none'
       }`}
     >

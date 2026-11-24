@@ -37,7 +37,7 @@ interface LeftActivityPillProps {
  * Unified Left Floating Pill Activity Rail (Workspace + iPad Pro Tools + Keyboard).
  * Frees 100% of the right edge for the Code Editor & Console.
  */
-export const LeftActivityPill: React.FC<LeftActivityPillProps> = ({
+export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
   sidebarView,
   diffOpen,
   consoleDock,
@@ -93,7 +93,7 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = ({
         {/* Top Pill: Workspace & Navigation (vòng kính nổi trượt lò xo dọc mượt) */}
         <div
           style={pillContainerStyle}
-          className="rounded-full p-1 sm:p-1.5 backdrop-blur-2xl"
+          className="rounded-full p-1 sm:p-1.5 backdrop-blur-lg"
         >
           <div className="relative flex flex-col items-center gap-1">
             <div
@@ -167,7 +167,7 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = ({
         {/* Middle Pill: iPad Pro Workspace Tools (vòng kính nổi trượt lò xo dọc mượt) */}
         <div
           style={pillContainerStyle}
-          className="rounded-full p-1 sm:p-1.5 backdrop-blur-2xl"
+          className="rounded-full p-1 sm:p-1.5 backdrop-blur-lg"
         >
           <div className="relative flex flex-col items-center gap-1">
             <div
@@ -250,7 +250,7 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = ({
       {/* Bottom Pill: Hardware Keyboard Mode & Magic Keyboard HUD (vòng kính trượt lò xo mượt) */}
       <div
         style={pillContainerStyle}
-        className="rounded-full p-1 sm:p-1.5 backdrop-blur-2xl shrink-0"
+        className="rounded-full p-1 sm:p-1.5 backdrop-blur-lg shrink-0"
       >
         <div className="relative flex flex-col items-center gap-1">
           <div
@@ -311,4 +311,4 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = ({
       </div>
     </nav>
   );
-};
+});

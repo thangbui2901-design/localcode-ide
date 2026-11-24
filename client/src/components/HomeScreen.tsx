@@ -1212,7 +1212,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             boxShadow:
               '0 14px 36px -8px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.14)'
           }}
-          className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-2xl"
+          className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-lg"
         >
           <div className="relative flex items-center">
             {/* Viên thuốc nền bo tròn cho mục đang chọn */}

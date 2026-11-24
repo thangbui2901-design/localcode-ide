@@ -15,7 +15,7 @@ interface StatusBarProps {
   onOpenShortcutsHud?: () => void;
 }
 
-export const StatusBar: React.FC<StatusBarProps> = ({
+export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   mode,
   onToggleMode,
   activeFile,
@@ -180,4 +180,4 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </div>
     </footer>
   );
-};
+});
