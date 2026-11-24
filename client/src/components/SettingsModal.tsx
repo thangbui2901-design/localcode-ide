@@ -454,6 +454,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div
               key={activeTab}
+              style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
               className="flex-1 min-w-0 overflow-y-auto no-scrollbar p-4 sm:p-5 space-y-5 tab-content-enter"
             >
             {/* ==================== TAB 1: GIAO DIỆN ==================== */}

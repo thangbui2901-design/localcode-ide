@@ -2962,10 +2962,14 @@ export default function App() {
         <header
           style={{
             backgroundColor: 'var(--bg-panel)',
-            borderBottom: '1px solid var(--border-subtle)'
+            borderBottom: '1px solid var(--border-subtle)',
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingLeft: 'max(12px, env(safe-area-inset-left))',
+            paddingRight: 'max(12px, env(safe-area-inset-right))'
           }}
-          className="h-14 px-3 flex items-center justify-between gap-2 shrink-0 relative z-20"
+          className="glass-surface w-full shrink-0 relative z-20"
         >
+          <div className="h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               type="button"
@@ -3015,6 +3019,7 @@ export default function App() {
             >
               <MoreHorizontal size={17} />
             </button>
+          </div>
           </div>
         </header>
 
@@ -3075,7 +3080,16 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 min-h-0 flex flex-col p-2 relative">
+        <div
+          style={{
+            paddingLeft: 'max(8px, env(safe-area-inset-left))',
+            paddingRight: 'max(8px, env(safe-area-inset-right))',
+            paddingBottom: isKeyboardOpen
+              ? 'max(8px, env(safe-area-inset-bottom))'
+              : 'calc(78px + max(10px, calc(env(safe-area-inset-bottom) - 10px)))'
+          }}
+          className="flex-1 min-h-0 flex flex-col pt-2 relative"
+        >
           <div
             className={`flex-1 min-h-0 flex flex-col ide-card overflow-hidden ${
               mobileTab === 'editor' ? 'flex tab-content-enter' : 'hidden'
@@ -3264,8 +3278,8 @@ export default function App() {
   const outerGapClass = zenMode
     ? 'p-4 sm:p-8 gap-0'
     : uiDensity === 'compact'
-      ? 'px-2 pb-1.5 pt-1 gap-1.5'
-      : 'px-3 pb-2 pt-1.5 gap-2.5';
+      ? 'gap-1.5'
+      : 'gap-2.5';
   const showRightConsoleDock =
     bottomOpen && consoleDock === 'right' && (breakpoint === 'desktop' || width >= 900);
   const showRightPanel = !zenMode && (ipadRightTool !== null || showRightConsoleDock);
@@ -3283,7 +3297,19 @@ export default function App() {
         onDrop={handleWorkspaceDrop}
         style={{
           backgroundColor: 'var(--bg-canvas)',
-          color: 'var(--text-primary)'
+          color: 'var(--text-primary)',
+          paddingTop: zenMode ? undefined : 'max(6px, env(safe-area-inset-top))',
+          paddingRight: zenMode
+            ? undefined
+            : uiDensity === 'compact'
+              ? 'max(8px, env(safe-area-inset-right))'
+              : 'max(12px, env(safe-area-inset-right))',
+          paddingBottom: zenMode ? undefined : 'max(6px, calc(env(safe-area-inset-bottom) - 6px))',
+          paddingLeft: zenMode
+            ? undefined
+            : uiDensity === 'compact'
+              ? 'max(8px, env(safe-area-inset-left))'
+              : 'max(12px, env(safe-area-inset-left))'
         }}
         className={`glass-canvas ios-view-push w-full h-full flex flex-col ${outerGapClass} overflow-hidden select-none relative z-10`}
       >

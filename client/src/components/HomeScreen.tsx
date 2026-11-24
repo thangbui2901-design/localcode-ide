@@ -663,14 +663,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         if (swipedRowId) setSwipedRowId(null);
       }}
     >
-      {/* PRO STUDIO TOP HEADER */}
+      {/* PRO STUDIO TOP HEADER — FULL-BLEED EDGE-TO-EDGE (KHÔNG LẸM 2 BÊN KHI XOAY NGANG) */}
       <header
         style={{
           backgroundColor: 'var(--bg-canvas)',
-          borderBottom: '1px solid var(--border-subtle)'
+          borderBottom: '1px solid var(--border-subtle)',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingLeft: 'max(16px, env(safe-area-inset-left))',
+          paddingRight: 'max(16px, env(safe-area-inset-right))'
         }}
-        className="glass-surface px-4 sm:px-6 h-14 flex items-center justify-between gap-3 shrink-0 relative z-20"
+        className="glass-surface w-full shrink-0 relative z-20"
       >
+        <div className="h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
@@ -744,11 +748,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Settings size={19} />
           </button>
         </div>
+        </div>
       </header>
 
-      {/* MAIN SCROLLABLE PRO LAUNCHPAD */}
-      <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
-        <div className="max-w-5xl mx-auto space-y-6 sm:space-y-7 pb-4">
+      {/* MAIN SCROLLABLE PRO LAUNCHPAD — FULL-HEIGHT TRÀN ĐÁY MÀN HÌNH, CUỘN MƯỢT DƯỚI THANH BAR NỔI */}
+      <main
+        style={{
+          paddingLeft: 'max(16px, env(safe-area-inset-left))',
+          paddingRight: 'max(16px, env(safe-area-inset-right))',
+          paddingBottom: 'calc(96px + max(10px, env(safe-area-inset-bottom)))'
+        }}
+        className="flex-1 min-h-0 overflow-y-auto no-scrollbar pt-5 sm:pt-7"
+      >
+        <div className="max-w-5xl mx-auto space-y-6 sm:space-y-7">
           {/* ===== SECTION 1: CLEAN EDITORIAL HERO HEADER ===== */}
           <section
             style={{ animationDelay: '20ms' }}
@@ -1184,14 +1196,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </main>
 
-      {/* FLOATING ROUNDED PILL BOTTOM TAB BAR (CHUẨN iOS CAPSULE) */}
-      <nav className="w-full shrink-0 select-none px-4 pt-1.5 pb-2.5 z-20 pointer-events-none">
+      {/* FLOATING ROUNDED PILL BOTTOM TAB BAR — NỔI THẬT TRÊN FULL MÀN HÌNH, SÁT HOME INDICATOR */}
+      <nav
+        style={{
+          paddingBottom: 'max(10px, calc(env(safe-area-inset-bottom) - 10px))',
+          paddingLeft: 'max(16px, env(safe-area-inset-left))',
+          paddingRight: 'max(16px, env(safe-area-inset-right))'
+        }}
+        className="fixed inset-x-0 bottom-0 select-none pt-1 z-30 pointer-events-none"
+      >
         <div
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 86%, transparent)',
+            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 84%, transparent)',
             border: '1px solid var(--border-subtle)',
             boxShadow:
-              '0 14px 36px -10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+              '0 14px 36px -8px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.14)'
           }}
           className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-2xl"
         >
@@ -1256,7 +1275,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {actionTarget && (
         <div
           onClick={() => setActionTarget(null)}
-          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 sm:p-4 ios-backdrop-enter"
+          style={{
+            paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+            paddingLeft: 'max(12px, env(safe-area-inset-left))',
+            paddingRight: 'max(12px, env(safe-area-inset-right))'
+          }}
+          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center pt-3 ios-backdrop-enter"
         >
           <div
             onClick={(e) => e.stopPropagation()}

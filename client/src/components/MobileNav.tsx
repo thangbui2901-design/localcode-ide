@@ -53,13 +53,20 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   };
 
   return (
-    <nav className="w-full shrink-0 select-none px-3.5 pt-1.5 pb-2.5 z-20 pointer-events-none">
+    <nav
+      style={{
+        paddingBottom: 'max(10px, calc(env(safe-area-inset-bottom) - 10px))',
+        paddingLeft: 'max(14px, env(safe-area-inset-left))',
+        paddingRight: 'max(14px, env(safe-area-inset-right))'
+      }}
+      className="fixed inset-x-0 bottom-0 select-none pt-1 z-30 pointer-events-none"
+    >
       <div
         style={{
-          backgroundColor: 'color-mix(in srgb, var(--bg-panel) 86%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--bg-panel) 84%, transparent)',
           border: '1px solid var(--border-subtle)',
           boxShadow:
-            '0 14px 36px -10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+            '0 14px 36px -8px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.14)'
         }}
         className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-2xl"
       >
