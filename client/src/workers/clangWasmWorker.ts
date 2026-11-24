@@ -352,11 +352,17 @@ function normalizeClangStdFlag(isC: boolean, stdFlag: string): string {
   return '-std=c++17';
 }
 
-function wrapUnbufferedStdoutShim(code: string, isC: boolean, interactive: boolean): string {
+function wrapUnbufferedStdoutShim(
+  code: string,
+  isC: boolean,
+  interactive: boolean,
+  fileName: string
+): string {
   if (!interactive) return code;
   const safeCode = isC
     ? code
     : code.replace(/\bsync_with_stdio\s*\(\s*(?:false|0)\s*\)/g, 'sync_with_stdio(true)');
+  const safeName = fileName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
   return `#pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
@@ -372,7 +378,7 @@ static void __lc_wasi_unbuf_stdout(void) {
 #endif
 }
 #pragma clang diagnostic pop
-#line 1
+#line 1 "${safeName}"
 ${safeCode}`;
 }
 
@@ -1133,7 +1139,7 @@ workerCtx.onmessage = async (event: MessageEvent<WorkerPayload>) => {
 
     if (!wasmModule) {
       const filesIn: YoWaspTree = {
-        [entryName]: wrapUnbufferedStdoutShim(msg.code, isC, interactive),
+        [entryName]: wrapUnbufferedStdoutShim(msg.code, isC, interactive, entryName),
         bits: {
           'stdc++.h': BITS_STDCPP_HEADER
         }

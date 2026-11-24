@@ -55,10 +55,16 @@ function escapeCString(str: string): string {
 function wrapCppRuntimeShim(
   code: string,
   isC: boolean,
-  opts: { interactive: boolean; syncFiles: boolean; dataFiles: SyncedWorkspaceFile[] }
+  opts: {
+    interactive: boolean;
+    syncFiles: boolean;
+    dataFiles: SyncedWorkspaceFile[];
+    fileName?: string;
+  }
 ): string {
-  const { interactive, syncFiles, dataFiles } = opts;
+  const { interactive, syncFiles, dataFiles, fileName } = opts;
   if (!interactive && !syncFiles) return code;
+  const safeFileLabel = escapeCString(fileName || (isC ? 'main.c' : 'main.cpp'));
 
   const safeUserCode =
     !isC && interactive
@@ -342,7 +348,7 @@ ${initFsBody}
 ${initStdinBody}
 }
 #pragma GCC diagnostic pop
-#line 1
+#line 1 "${safeFileLabel}"
 `;
 
   return shim + safeUserCode;
@@ -727,16 +733,35 @@ function prepareCppProjectFiles(
     };
   }
 
-  const hasMain = (content: string) => /\bint\s+main\s*\(/.test(content);
+  const stripComments = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const hasMain = (content: string) =>
+    /\b(?:int|void|auto)\s+main\s*\(/.test(stripComments(content));
+  const hasLocalIncludes = (content: string) =>
+    /^\s*#include\s+"[^"]+"/m.test(stripComments(content));
+
+  const activeHasMain = hasMain(activeFile.content);
   const entryFile =
-    (hasMain(activeFile.content) ? activeFile : siblingFiles.find((f) => hasMain(f.content))) ||
-    activeFile;
+    (activeHasMain ? activeFile : siblingFiles.find((f) => hasMain(f.content))) || activeFile;
+
+  // Tệp bài tập độc lập (có main() và không #include "..." tệp nội bộ):
+  // KHÔNG gộp các tệp .cpp khác cùng thư mục để tránh trùng hàm / trùng int main()!
+  if (entryFile.path === activeFile.path && !hasLocalIncludes(entryFile.content)) {
+    return {
+      entryCode: entryFile.content,
+      entryFileName: entryFile.name,
+      extraFiles: [],
+      extraSourceNames: []
+    };
+  }
 
   const extraFiles: WandboxExtraFile[] = [];
   const extraSourceNames: string[] = [];
 
   for (const file of siblingFiles) {
     if (file.path === entryFile.path) continue;
+    // Tuyệt đối không gộp thêm tệp nguồn khác cũng định nghĩa hàm main()
+    if (sourceExt.test(file.name) && hasMain(file.content)) continue;
     extraFiles.push({ file: file.name, code: file.content });
     if (sourceExt.test(file.name)) {
       extraSourceNames.push(file.name);
@@ -772,36 +797,47 @@ async function runWithGodbolt(
   const isC = activeFile.language === 'c';
   const compilerId = isC ? 'cg142' : 'g142';
   const stdFlag = resolveStdFlag(isC, compilerSettings);
-  const { entryCode, extraFiles } = prepareCppProjectFiles(activeFile, latestFiles, isC);
+  const { entryCode, entryFileName, extraFiles } = prepareCppProjectFiles(
+    activeFile,
+    latestFiles,
+    isC
+  );
 
   let combinedSource = entryCode;
   if (extraFiles.length > 0) {
     const fileMap = new Map(extraFiles.map((f) => [f.file, f.code]));
-    combinedSource = combinedSource.replace(
-      /^\s*#include\s+"([^"]+)"\s*$/gm,
-      (match, incName: string) => {
+    const inlinedHeaders = new Set<string>();
+    const headerBlocks: string[] = [];
+
+    const collectAndStripIncludes = (src: string): string =>
+      src.replace(/^\s*#include\s+"([^"]+)"\s*$/gm, (match, incName: string) => {
+        if (inlinedHeaders.has(incName)) return '';
         const headerContent = fileMap.get(incName);
         if (headerContent !== undefined) {
+          inlinedHeaders.add(incName);
           fileMap.delete(incName);
-          return `// --- ${incName} ---\n${headerContent}`;
+          const cleanedHeader = collectAndStripIncludes(headerContent);
+          headerBlocks.push(`// --- ${incName} ---\n${cleanedHeader}`);
+          return '';
         }
         return match;
-      }
-    );
+      });
 
-    const remainingSources = Array.from(fileMap.entries())
-      .map(([name, code]) => `// --- ${name} ---\n${code}`)
-      .join('\n\n');
-
-    if (remainingSources) {
-      combinedSource = `${remainingSources}\n\n${combinedSource}`;
+    const cleanedEntry = collectAndStripIncludes(entryCode);
+    const implBlocks: string[] = [];
+    for (const [name, code] of Array.from(fileMap.entries())) {
+      if (/\.(h|hpp|hh)$/i.test(name)) continue;
+      implBlocks.push(`// --- ${name} ---\n${collectAndStripIncludes(code)}`);
     }
+
+    combinedSource = [...headerBlocks, ...implBlocks, cleanedEntry].filter(Boolean).join('\n\n');
   }
 
   const finalSource = wrapCppRuntimeShim(combinedSource, isC, {
     interactive,
     syncFiles,
-    dataFiles
+    dataFiles,
+    fileName: entryFileName
   });
 
   const response = await fetch(`https://godbolt.org/api/compiler/${compilerId}/compile`, {
@@ -874,7 +910,7 @@ async function runWithWandboxFallback(
   const startTime = performance.now();
   const isC = activeFile.language === 'c';
   const stdFlag = resolveStdFlag(isC, compilerSettings);
-  const { entryCode, extraFiles, extraSourceNames } = prepareCppProjectFiles(
+  const { entryCode, entryFileName, extraFiles, extraSourceNames } = prepareCppProjectFiles(
     activeFile,
     latestFiles,
     isC
@@ -883,7 +919,8 @@ async function runWithWandboxFallback(
   const finalCode = wrapCppRuntimeShim(entryCode, isC, {
     interactive,
     syncFiles,
-    dataFiles
+    dataFiles,
+    fileName: entryFileName
   });
 
   const payload: Record<string, unknown> = {
