@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   GripHorizontal,
   X,
@@ -28,6 +28,9 @@ export const VirtualTrackpad: React.FC<VirtualTrackpadProps> = ({
 }) => {
   const [pos, setPos] = useState({ x: 24, y: 84 });
   const [selectMode, setSelectMode] = useState(false);
+  const [mounted, setMounted] = useState(open);
+  const [visible, setVisible] = useState(false);
+  const [isDraggingWin, setIsDraggingWin] = useState(false);
   const [reticle, setReticle] = useState<{ x: number; y: number; active: boolean }>({
     x: 0,
     y: 0,
@@ -39,10 +42,24 @@ export const VirtualTrackpad: React.FC<VirtualTrackpadProps> = ({
   );
   const padRef = useRef<{ lastX: number; lastY: number; accX: number; accY: number } | null>(null);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const raf = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setVisible(true));
+      });
+      return () => window.cancelAnimationFrame(raf);
+    }
+    setVisible(false);
+    const t = window.setTimeout(() => setMounted(false), 280);
+    return () => window.clearTimeout(t);
+  }, [open]);
+
+  if (!mounted) return null;
 
   const startWindowDrag = (e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDraggingWin(true);
     dragWinRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -65,6 +82,7 @@ export const VirtualTrackpad: React.FC<VirtualTrackpadProps> = ({
 
   const endWindowDrag = () => {
     dragWinRef.current = null;
+    setIsDraggingWin(false);
   };
 
   const handlePadDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -111,11 +129,24 @@ export const VirtualTrackpad: React.FC<VirtualTrackpadProps> = ({
       style={{
         right: `${pos.x}px`,
         bottom: `${pos.y}px`,
-        backgroundColor: 'var(--bg-panel)',
+        backgroundColor: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
         border: '1px solid var(--border-subtle)',
-        color: 'var(--text-primary)'
+        boxShadow: '0 20px 48px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+        color: 'var(--text-primary)',
+        opacity: visible ? 1 : 0,
+        transform: visible
+          ? 'translate3d(0, 0, 0) scale(1)'
+          : 'translate3d(0, 20px, 0) scale(0.86)',
+        filter: visible ? 'blur(0px)' : 'blur(6px)',
+        transformOrigin: 'bottom right',
+        transition: isDraggingWin
+          ? 'none'
+          : 'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.28s ease',
+        willChange: 'transform, opacity, filter'
       }}
-      className="fixed z-40 w-60 rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden select-none ios-popover-enter"
+      className={`fixed z-40 w-60 rounded-2xl backdrop-blur-2xl overflow-hidden select-none ${
+        visible ? '' : 'pointer-events-none'
+      }`}
     >
       {/* Draggable Title Bar */}
       <div

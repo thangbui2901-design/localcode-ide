@@ -36,6 +36,20 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
         runtimeCaching: [
           {
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@yowasp\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'clang-wasm-offline-cache',
+              expiration: {
+                maxEntries: 40,
+                maxAgeSeconds: 60 * 60 * 24 * 90
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/pyodide\/.*/i,
             handler: 'CacheFirst',
             options: {

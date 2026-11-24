@@ -8,7 +8,11 @@ import {
   Upload,
   ChevronRight,
   ChevronDown,
-  X
+  X,
+  Plus,
+  MoreHorizontal,
+  ImagePlus,
+  Download
 } from 'lucide-react';
 import { FileNode, WorkspaceFile } from '../types/ide';
 import { FileTypeIcon } from './FileTypeIcon';
@@ -22,6 +26,9 @@ interface ExplorerSidebarProps {
   onCreateFolder: (relPath: string) => Promise<void> | void;
   onRenameEntry?: (oldPath: string, newPath: string) => Promise<void> | void;
   onImportCodeFiles?: (files: FileList) => Promise<void> | void;
+  onImportAssets?: (files: FileList) => Promise<void> | void;
+  onExportBackup?: () => void;
+  onImportBackup?: (file: File) => void;
   onDeleteEntry: (relPath: string) => Promise<void> | void;
   onRefresh: () => void;
   onCloseMobile?: () => void;
@@ -37,12 +44,17 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
   onCreateFolder,
   onRenameEntry,
   onImportCodeFiles,
+  onImportAssets,
+  onExportBackup,
+  onImportBackup,
   onDeleteEntry,
   onRefresh,
   onCloseMobile,
   isOverlay
 }) => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [rootExpanded, setRootExpanded] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState<{
     type: 'file' | 'folder';
     parentPath: string;
@@ -55,6 +67,18 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
   const [renameDraft, setRenameDraft] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [menuOpen]);
 
   // Mặc định mở sẵn các thư mục cấp 1
   useEffect(() => {
@@ -290,24 +314,23 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
           if (!isBeingRenamed && fileObj) onSelectFile(fileObj);
         }}
         style={{
-          paddingLeft: `${depth * 14 + 20}px`,
-          backgroundColor: isSelected ? 'var(--bg-active)' : undefined,
-          color: 'var(--text-primary)'
+          paddingLeft: `${depth * 14 + 22}px`,
+          backgroundColor: isSelected
+            ? 'color-mix(in srgb, var(--text-primary) 9%, transparent)'
+            : undefined,
+          border: isSelected
+            ? '1px solid color-mix(in srgb, var(--text-primary) 8%, transparent)'
+            : '1px solid transparent',
+          boxShadow: isSelected ? 'inset 0 1px 0 rgba(255, 255, 255, 0.06)' : undefined,
+          color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)'
         }}
-        className={`group h-7 pr-2 rounded-lg flex items-center justify-between gap-1.5 cursor-pointer text-xs transition-colors relative ${
+        className={`group h-8 pr-2.5 rounded-xl flex items-center justify-between gap-1.5 cursor-pointer text-[13px] transition-all relative ${
           isSelected
-            ? 'font-semibold'
-            : 'hover:bg-[var(--bg-hover)]/70 opacity-90 hover:opacity-100'
+            ? 'font-medium'
+            : 'hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-primary)]'
         }`}
       >
-        {isSelected && (
-          <span
-            aria-hidden="true"
-            style={{ backgroundColor: 'var(--accent-primary)' }}
-            className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-r-full"
-          />
-        )}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <FileTypeIcon fileName={node.name} size={15} />
           {isBeingRenamed ? (
             <input
@@ -375,66 +398,37 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col overflow-hidden select-none">
-      {/* Thanh hành động nhanh */}
-      <div className="px-3 py-2 flex items-center justify-between gap-1 shrink-0">
+      {/* Editorial Minimal Header: "Explorer" + "+" + "···" (giống hệt ảnh mẫu) */}
+      <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2 shrink-0 relative">
         <span
-          style={{ color: 'var(--text-secondary)' }}
-          className="text-[11px] font-bold uppercase tracking-wider"
+          style={{ color: 'var(--text-primary)' }}
+          className="text-[15px] font-medium tracking-tight"
         >
-          Workspace
+          Explorer
         </span>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5" ref={menuRef}>
           <button
             type="button"
-            onClick={() => startCreate('file', '')}
+            onClick={() => {
+              setRootExpanded(true);
+              startCreate('file', '');
+            }}
             style={{ color: 'var(--text-secondary)' }}
-            className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
-            title="Tạo tệp mới (vd: app.js, main.c, index.html)"
+            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
+            title="Tạo tệp mới"
           >
-            <FilePlus size={14} />
+            <Plus size={16} strokeWidth={1.8} />
           </button>
 
           <button
             type="button"
-            onClick={() => startCreate('folder', '')}
+            onClick={() => setMenuOpen((v) => !v)}
             style={{ color: 'var(--text-secondary)' }}
-            className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
-            title="Tạo thư mục mới"
+            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
+            title="Tùy chọn Workspace"
           >
-            <FolderPlus size={14} />
-          </button>
-
-          {onImportCodeFiles && (
-            <label
-              style={{ color: 'var(--text-secondary)' }}
-              className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-emerald-400 transition-colors cursor-pointer"
-              title="Mở / Nhập tệp code lẻ từ máy (iPad Files)"
-            >
-              <Upload size={13} />
-              <input
-                type="file"
-                multiple
-                accept=".cpp,.cc,.cxx,.c,.h,.hpp,.py,.html,.htm,.css,.js,.mjs,.json,.md,.txt"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    onImportCodeFiles(e.target.files);
-                    e.target.value = '';
-                  }
-                }}
-              />
-            </label>
-          )}
-
-          <button
-            type="button"
-            onClick={onRefresh}
-            style={{ color: 'var(--text-secondary)' }}
-            className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
-            title="Làm mới danh sách"
-          >
-            <RefreshCw size={13} />
+            <MoreHorizontal size={16} strokeWidth={1.8} />
           </button>
 
           {(isOverlay || onCloseMobile) && (
@@ -442,19 +436,152 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
               type="button"
               onClick={onCloseMobile}
               style={{ color: 'var(--text-secondary)' }}
-              className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-rose-500 transition-colors"
+              className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-rose-400 flex items-center justify-center transition-colors"
               title="Đóng"
             >
-              <X size={14} />
+              <X size={15} />
             </button>
+          )}
+
+          {menuOpen && (
+            <div
+              style={{
+                backgroundColor: 'var(--bg-panel)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-primary)'
+              }}
+              className="absolute right-3 top-11 w-52 rounded-2xl p-1.5 shadow-2xl z-50 ios-popover-enter space-y-0.5"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setRootExpanded(true);
+                  startCreate('folder', '');
+                }}
+                className="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors"
+              >
+                <FolderPlus size={14} style={{ color: 'var(--text-secondary)' }} />
+                <span>Tạo thư mục mới</span>
+              </button>
+
+              {onImportCodeFiles && (
+                <label className="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer">
+                  <Upload size={14} style={{ color: 'var(--text-secondary)' }} />
+                  <span>Nhập tệp code lẻ</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".cpp,.cc,.cxx,.c,.h,.hpp,.py,.html,.htm,.css,.js,.mjs,.json,.md,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      setMenuOpen(false);
+                      if (e.target.files && e.target.files.length > 0) {
+                        onImportCodeFiles(e.target.files);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+              )}
+
+              {onImportAssets && (
+                <label className="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer">
+                  <ImagePlus size={14} style={{ color: 'var(--text-secondary)' }} />
+                  <span>Import Ảnh / Font</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.json,.woff,.woff2,.ttf,.otf"
+                    className="hidden"
+                    onChange={(e) => {
+                      setMenuOpen(false);
+                      if (e.target.files && e.target.files.length > 0) {
+                        onImportAssets(e.target.files);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRefresh();
+                }}
+                className="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors"
+              >
+                <RefreshCw size={14} style={{ color: 'var(--text-secondary)' }} />
+                <span>Làm mới danh sách</span>
+              </button>
+
+              {(onExportBackup || onImportBackup) && (
+                <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-subtle)' }} />
+              )}
+
+              {onExportBackup && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onExportBackup();
+                  }}
+                  className="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors"
+                >
+                  <Download size={14} style={{ color: 'var(--text-secondary)' }} />
+                  <span>Sao lưu Workspace</span>
+                </button>
+              )}
+
+              {onImportBackup && (
+                <label className="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer">
+                  <Upload size={14} style={{ color: 'var(--text-secondary)' }} />
+                  <span>Khôi phục JSON</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => {
+                      setMenuOpen(false);
+                      const f = e.target.files?.[0];
+                      if (f) onImportBackup(f);
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Cây thư mục & tệp */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-0.5">
-        {creating?.parentPath === '' && renderInlineCreator(0)}
-        {tree.map((node) => renderNode(node, 0))}
+      {/* Cây thư mục & tệp bắt đầu từ gốc "Workspace" giống hệt "Portfolio project" */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2.5 pb-3 space-y-0.5">
+        <button
+          type="button"
+          onClick={() => setRootExpanded((v) => !v)}
+          style={{ color: 'var(--text-primary)' }}
+          className="w-full h-8 px-2 rounded-xl flex items-center gap-2 text-[13px] font-medium hover:bg-[var(--bg-hover)]/40 transition-colors"
+        >
+          <span style={{ color: 'var(--text-secondary)' }} className="shrink-0">
+            {rootExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </span>
+          <span className="truncate opacity-90">Code With You</span>
+          <span
+            style={{ color: 'var(--text-secondary)' }}
+            className="ml-auto text-[11px] opacity-60 font-mono"
+          >
+            {files.length}
+          </span>
+        </button>
+
+        {rootExpanded && (
+          <div className="space-y-0.5">
+            {creating?.parentPath === '' && renderInlineCreator(1)}
+            {tree.map((node) => renderNode(node, 1))}
+          </div>
+        )}
       </div>
     </div>
   );

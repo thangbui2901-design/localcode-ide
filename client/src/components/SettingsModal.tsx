@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   Palette,
@@ -12,9 +12,13 @@ import {
   VolumeX,
   Minus,
   Plus,
-  ImagePlus
+  ImagePlus,
+  FolderSync,
+  RefreshCw,
+  WifiOff,
+  Sparkles
 } from 'lucide-react';
-import { CompilerSettings, EditorSettings, ExecutionMode } from '../types/ide';
+import { CompilerSettings, CppCompilerEngine, EditorSettings, ExecutionMode } from '../types/ide';
 import {
   playSoftKeyClick,
   KeySoundProfile,
@@ -27,78 +31,18 @@ import {
   VisualPreferences,
   compressWallpaperFile
 } from '../utils/visualPrefs';
+import {
+  hapticLight,
+  isIosFilesAutoMirrorEnabled,
+  isNativeIosFilesSyncAvailable,
+  setIosFilesAutoMirrorEnabled
+} from '../utils/iosNative';
+import { UI_THEMES, UiThemeId } from '../utils/themes';
 
-export type UiThemeId =
-  | 'midnight-indigo'
-  | 'cyber-emerald'
-  | 'dracula-neon'
-  | 'vscode-dark'
-  | 'lavender-light'
-  | 'solarized-light';
-
+export type { UiThemeId };
 export type UiDensity = 'bento' | 'compact';
 
 type SettingsTab = 'appearance' | 'editor' | 'compiler' | 'data';
-
-interface ThemeItem {
-  id: UiThemeId;
-  name: string;
-  mode: 'Dark' | 'Light';
-  canvasBg: string;
-  bgSwatch: string;
-  accentSwatch: string;
-}
-
-const THEME_LIST: ThemeItem[] = [
-  {
-    id: 'midnight-indigo',
-    name: 'Midnight Navy',
-    mode: 'Dark',
-    canvasBg: '#080C18',
-    bgSwatch: '#0E1426',
-    accentSwatch: '#3B82F6'
-  },
-  {
-    id: 'cyber-emerald',
-    name: 'Cyber Emerald',
-    mode: 'Dark',
-    canvasBg: '#060D0B',
-    bgSwatch: '#0C1714',
-    accentSwatch: '#10B981'
-  },
-  {
-    id: 'dracula-neon',
-    name: 'Dracula Neon',
-    mode: 'Dark',
-    canvasBg: '#13141B',
-    bgSwatch: '#1B1C26',
-    accentSwatch: '#BD93F9'
-  },
-  {
-    id: 'vscode-dark',
-    name: 'VS Code Dark+',
-    mode: 'Dark',
-    canvasBg: '#121212',
-    bgSwatch: '#1E1E1E',
-    accentSwatch: '#0EA5E9'
-  },
-  {
-    id: 'lavender-light',
-    name: 'Daylight',
-    mode: 'Light',
-    canvasBg: '#EEF1F8',
-    bgSwatch: '#FFFFFF',
-    accentSwatch: '#2563EB'
-  },
-  {
-    id: 'solarized-light',
-    name: 'Solarized',
-    mode: 'Light',
-    canvasBg: '#EEE8D5',
-    bgSwatch: '#FDF6E3',
-    accentSwatch: '#D97706'
-  }
-];
 
 const SOUND_PROFILES: Array<{ id: KeySoundProfile; label: string }> = [
   { id: 'waterdrop', label: 'Giọt nước' },
@@ -123,6 +67,13 @@ interface SettingsModalProps {
   onChangeUiDensity?: (density: UiDensity) => void;
   typingSound?: boolean;
   onChangeTypingSound?: (enabled: boolean) => void;
+  hapticsEnabled?: boolean;
+  onChangeHapticsEnabled?: (enabled: boolean) => void;
+  onSyncDeviceFiles?: () => void;
+  isSyncingFiles?: boolean;
+  onPreloadOfflineCpp?: () => void;
+  offlineCppState?: 'idle' | 'loading' | 'ready';
+  offlineCppPercent?: number;
   visualPrefs?: VisualPreferences;
   onUpdateVisualPrefs?: (patch: Partial<VisualPreferences>) => void;
 }
@@ -184,6 +135,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeUiDensity,
   typingSound = true,
   onChangeTypingSound,
+  hapticsEnabled = true,
+  onChangeHapticsEnabled,
+  onSyncDeviceFiles,
+  isSyncingFiles = false,
+  onPreloadOfflineCpp,
+  offlineCppState = 'idle',
+  offlineCppPercent = 0,
   visualPrefs,
   onUpdateVisualPrefs
 }) => {
@@ -192,29 +150,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const [soundProfile, setSoundProfile] = useState<KeySoundProfile>(() => getSavedSoundProfile());
   const [soundVolume, setSoundVolume] = useState<number>(() => getSavedSoundVolume());
+  const [iosAutoMirror, setIosAutoMirror] = useState<boolean>(() => isIosFilesAutoMirrorEnabled());
+  const [themeFilter, setThemeFilter] = useState<'all' | 'dark' | 'light'>('all');
   const [dragY, setDragY] = useState(0);
-  const dragStartYRef = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [entered, setEntered] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const dragStartRef = useRef<{ y: number; time: number } | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setEntered(false);
+      setClosing(false);
+      setDragY(0);
+      setIsDragging(false);
+      return;
+    }
+    setClosing(false);
+    setDragY(0);
+    setIsDragging(false);
+    const raf = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setEntered(true));
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, [open]);
 
   if (!open) return null;
 
+  const requestAnimatedClose = () => {
+    if (closing) return;
+    setClosing(true);
+    setIsDragging(false);
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      onClose();
+    }, 260);
+  };
+
   const handleSheetPointerDown = (e: React.PointerEvent) => {
-    dragStartYRef.current = e.clientY;
+    if ((e.target as HTMLElement).closest('button')) return;
+    dragStartRef.current = { y: e.clientY, time: performance.now() };
+    setIsDragging(true);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const handleSheetPointerMove = (e: React.PointerEvent) => {
-    if (dragStartYRef.current === null) return;
-    const delta = Math.max(0, e.clientY - dragStartYRef.current);
-    setDragY(delta);
+    if (!dragStartRef.current) return;
+    const rawDelta = e.clientY - dragStartRef.current.y;
+    // Mượt 1:1 khi kéo xuống, đàn hồi nhẹ kiểu iOS khi kéo ngược lên
+    const nextY = rawDelta < 0 ? Math.round(rawDelta * 0.16) : rawDelta;
+    setDragY(nextY);
   };
 
-  const handleSheetPointerUp = () => {
-    if (dragStartYRef.current === null) return;
-    const pulled = dragY;
-    dragStartYRef.current = null;
-    if (pulled > 90) {
-      setDragY(0);
-      onClose();
+  const handleSheetPointerUp = (e: React.PointerEvent) => {
+    const start = dragStartRef.current;
+    if (!start) return;
+    const rawDelta = e.clientY - start.y;
+    const elapsed = Math.max(16, performance.now() - start.time);
+    const velocity = rawDelta / elapsed; // px / ms
+    dragStartRef.current = null;
+    setIsDragging(false);
+
+    if (rawDelta > 95 || (rawDelta > 35 && velocity > 0.55)) {
+      requestAnimatedClose();
     } else {
       setDragY(0);
     }
@@ -257,10 +262,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'data', label: 'Dữ liệu', icon: <Database size={15} />, color: '#F59E0B' }
   ];
 
+  const backdropOpacity = closing
+    ? 0
+    : !entered
+      ? 0
+      : Math.max(0.18, 1 - Math.max(0, dragY) / 420);
+
+  const sheetTransform = closing
+    ? 'translate3d(0, 100%, 0)'
+    : !entered
+      ? 'translate3d(0, 48px, 0) scale(0.97)'
+      : `translate3d(0, ${dragY}px, 0)`;
+
   return (
     <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-5 select-none ios-backdrop-enter"
+      onClick={requestAnimatedClose}
+      style={{
+        opacity: backdropOpacity,
+        transition: isDragging ? 'none' : 'opacity 0.28s var(--ease-ios-out)'
+      }}
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-5 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -269,12 +290,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           color: 'var(--text-primary)',
           boxShadow: 'var(--shadow-card)',
           border: '1px solid var(--border-subtle)',
-          transform: dragY > 0 ? `translate3d(0, ${dragY}px, 0)` : undefined,
-          transition: dragStartYRef.current === null ? 'transform 0.32s var(--ease-ios-spring)' : 'none'
+          transform: sheetTransform,
+          opacity: !entered && !closing ? 0 : 1,
+          transition: isDragging
+            ? 'none'
+            : closing
+              ? 'transform 0.26s var(--ease-ios-spring), opacity 0.22s ease'
+              : 'transform 0.36s var(--ease-ios-spring), opacity 0.24s var(--ease-ios-out)',
+          willChange: 'transform, opacity'
         }}
-        className="w-full sm:max-w-2xl h-[86vh] sm:h-[600px] max-h-[88vh] rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden ios-modal-enter"
+        className="w-full sm:max-w-2xl h-[86vh] sm:h-[600px] max-h-[88vh] rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
       >
-        {/* MOBILE HEADER (< md): VUỐT XUỐNG ĐỂ ĐÓNG + THANH 4 TAB */}
+        {/* MOBILE HEADER (< md): TOÀN BỘ VÙNG ĐẦU KÉO XUỐNG MƯỢT NHƯ iOS SHEET */}
         <div
           style={{
             backgroundColor: 'var(--bg-panel)',
@@ -287,35 +314,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             onPointerMove={handleSheetPointerMove}
             onPointerUp={handleSheetPointerUp}
             onPointerCancel={handleSheetPointerUp}
-            className="pt-2.5 pb-1 flex justify-center touch-none cursor-grab active:cursor-grabbing"
+            className="touch-none cursor-grab active:cursor-grabbing"
             title="Vuốt xuống để đóng"
           >
-            <span
-              className="w-10 h-1 rounded-full opacity-40"
-              style={{ backgroundColor: 'var(--text-secondary)' }}
-            />
-          </div>
-
-          <div className="h-12 px-5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <img
-                src="/app-logo.png"
-                alt="Code With You"
-                className="w-6 h-6 rounded-lg object-contain shrink-0"
+            <div className="pt-2.5 pb-1 flex justify-center">
+              <span
+                className="w-10 h-1 rounded-full opacity-45"
+                style={{ backgroundColor: 'var(--text-secondary)' }}
               />
-              <h2 className="text-base font-bold tracking-tight truncate" style={{ color: 'var(--text-primary)' }}>
-                Cài đặt
-              </h2>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ color: 'var(--accent-primary)' }}
-              className="px-2 py-1 text-sm font-semibold active:opacity-60 transition-opacity shrink-0"
-            >
-              Xong
-            </button>
+            <div className="h-12 px-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <img
+                  src="/app-logo.png"
+                  alt="Code With You"
+                  className="w-6 h-6 rounded-lg object-contain shrink-0 pointer-events-none"
+                />
+                <h2 className="text-base font-bold tracking-tight truncate" style={{ color: 'var(--text-primary)' }}>
+                  Cài đặt
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={requestAnimatedClose}
+                style={{ color: 'var(--accent-primary)' }}
+                className="px-2 py-1 text-sm font-semibold active:opacity-60 transition-opacity shrink-0"
+              >
+                Xong
+              </button>
+            </div>
           </div>
 
           <div className="px-3.5 pb-3">
@@ -411,7 +440,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <button
                 type="button"
-                onClick={onClose}
+                onClick={requestAnimatedClose}
                 style={{
                   backgroundColor: 'var(--bg-elevated)',
                   color: 'var(--text-secondary)'
@@ -431,16 +460,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'appearance' && (
               <>
                 <div className="space-y-2.5">
-                  <div
-                    className="px-1 text-[11px] font-bold uppercase tracking-wider"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    Chủ đề màu sắc (Theme)
+                  <div className="px-1 flex items-center justify-between gap-2 flex-wrap">
+                    <div
+                      className="text-[11px] font-bold uppercase tracking-wider"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      Chủ đề màu sắc ({UI_THEMES.length} Theme)
+                    </div>
+                    <div
+                      style={{ backgroundColor: 'var(--bg-panel)' }}
+                      className="p-0.5 rounded-xl flex items-center gap-0.5"
+                    >
+                      {(
+                        [
+                          { id: 'all', label: `Tất cả (${UI_THEMES.length})` },
+                          { id: 'dark', label: `Tối (${UI_THEMES.filter((t) => t.mode === 'dark').length})` },
+                          { id: 'light', label: `Sáng (${UI_THEMES.filter((t) => t.mode === 'light').length})` }
+                        ] as const
+                      ).map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setThemeFilter(tab.id)}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all ${
+                            themeFilter === tab.id
+                              ? 'accent-pill-active'
+                              : 'text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* 2x3 Visual Mini-Preview Theme Grid */}
+                  {/* Visual Mini-Preview Theme Grid with Authentic Syntax Swatches */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                    {THEME_LIST.map((item) => {
+                    {UI_THEMES.filter(
+                      (item) => themeFilter === 'all' || item.mode === themeFilter
+                    ).map((item) => {
                       const isSelected = uiTheme === item.id;
                       return (
                         <button
@@ -455,7 +513,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           }}
                           className="p-2.5 rounded-2xl text-left transition-all btn-lift space-y-2"
                         >
-                          {/* Mini code preview card */}
+                          {/* Mini code preview card with real theme syntax palette */}
                           <div
                             style={{ backgroundColor: item.bgSwatch }}
                             className="h-12 rounded-xl p-2 flex flex-col justify-between relative overflow-hidden border border-black/10"
@@ -466,16 +524,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80" />
                             </div>
                             <div className="space-y-1">
-                              <span
-                                className="block h-1.5 w-10 rounded-full"
-                                style={{ backgroundColor: item.accentSwatch }}
-                              />
-                              <span
-                                className="block h-1 w-14 rounded-full opacity-35"
-                                style={{
-                                  backgroundColor: item.mode === 'Dark' ? '#F8FAFC' : '#0F172A'
-                                }}
-                              />
+                              <div className="flex items-center gap-1">
+                                <span
+                                  className="block h-1.5 w-6 rounded-full"
+                                  style={{ backgroundColor: `#${item.syntax.keyword}` }}
+                                />
+                                <span
+                                  className="block h-1.5 w-8 rounded-full"
+                                  style={{ backgroundColor: `#${item.syntax.type}` }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span
+                                  className="block h-1 w-9 rounded-full"
+                                  style={{ backgroundColor: `#${item.syntax.string}` }}
+                                />
+                                <span
+                                  className="block h-1 w-4 rounded-full"
+                                  style={{ backgroundColor: `#${item.syntax.number}` }}
+                                />
+                              </div>
                             </div>
                             {isSelected && (
                               <span
@@ -498,7 +566,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               className="text-[10px] shrink-0"
                               style={{ color: 'var(--text-secondary)' }}
                             >
-                              {item.mode}
+                              {item.mode === 'dark' ? 'Dark' : 'Light'}
                             </span>
                           </div>
                         </button>
@@ -774,6 +842,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       }}
                     />
 
+                    {onChangeHapticsEnabled && (
+                      <IOSSwitchRow
+                        label="Rung phản hồi Taptic Engine (iOS/iPadOS)"
+                        description="Phản hồi xúc giác nhẹ khi chạy code, đạt AC 100%, chuyển tab & lưu tệp"
+                        checked={hapticsEnabled}
+                        onChange={(v) => {
+                          onChangeHapticsEnabled(v);
+                          if (v) hapticLight();
+                        }}
+                      />
+                    )}
+
                     {typingSound && (
                       <div className="px-4 py-3 space-y-3">
                         <div className="flex items-center justify-between gap-2">
@@ -1004,112 +1084,294 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* ==================== TAB 3: BIÊN DỊCH ==================== */}
             {activeTab === 'compiler' && (
-              <div className="space-y-2">
-                <div
-                  className="px-1 text-[11px] font-bold uppercase tracking-wider"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  Trình biên dịch &amp; Thực thi
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div
+                    className="px-1 text-[11px] font-bold uppercase tracking-wider"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    Trình biên dịch &amp; Thực thi
+                  </div>
+
+                  <div
+                    style={{ backgroundColor: 'var(--bg-panel)' }}
+                    className="rounded-2xl overflow-hidden divide-y divide-white/[0.06]"
+                  >
+                    <div className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                          Chế độ chạy
+                        </div>
+                        <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                          iPad/iPhone dùng Cloud + WASM Offline
+                        </div>
+                      </div>
+                      <select
+                        value={mode}
+                        onChange={(e) => onChangeMode(e.target.value as ExecutionMode)}
+                        style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                        className="h-8 px-2.5 rounded-xl text-xs font-medium outline-none cursor-pointer"
+                      >
+                        <option value="standalone">Cloud + WASM</option>
+                        <option value="local">Local PC Server</option>
+                      </select>
+                    </div>
+
+                    {/* Engine biên dịch C/C++ (Auto / Offline Clang WASM / Cloud GCC) */}
+                    <div className="px-4 py-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                            Engine biên dịch C/C++
+                          </div>
+                          <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                            Tự động chạy Offline LLVM Clang WASM ngay cả khi mất Wi-Fi
+                          </div>
+                        </div>
+                        <div
+                          style={{ backgroundColor: 'var(--bg-panel-alt)' }}
+                          className="p-0.5 rounded-xl flex items-center gap-0.5 shrink-0"
+                        >
+                          {(
+                            [
+                              { id: 'auto', label: 'Tự động' },
+                              { id: 'offline-wasm', label: 'Offline WASM' },
+                              { id: 'cloud', label: 'Cloud GCC' }
+                            ] as Array<{ id: CppCompilerEngine; label: string }>
+                          ).map((eng) => {
+                            const selected = (compilerSettings.cppEngine || 'auto') === eng.id;
+                            return (
+                              <button
+                                key={eng.id}
+                                type="button"
+                                onClick={() =>
+                                  onUpdateCompiler({ ...compilerSettings, cppEngine: eng.id })
+                                }
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                                  selected
+                                    ? 'accent-pill-active'
+                                    : 'text-[var(--text-secondary)]'
+                                }`}
+                              >
+                                {eng.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="px-4 py-3 flex items-center justify-between gap-3">
+                      <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                        Chuẩn C++
+                      </span>
+                      <div
+                        style={{ backgroundColor: 'var(--bg-panel-alt)' }}
+                        className="p-0.5 rounded-xl flex items-center gap-0.5"
+                      >
+                        {(['gnu++14', 'gnu++17', 'gnu++20'] as const).map((std) => (
+                          <button
+                            key={std}
+                            type="button"
+                            onClick={() => onUpdateCompiler({ ...compilerSettings, cppStandard: std })}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase transition-all ${
+                              compilerSettings.cppStandard === std
+                                ? 'accent-pill-active'
+                                : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            {std.replace('gnu++', 'C++')}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="px-4 py-3 flex items-center justify-between gap-3">
+                      <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                        Chuẩn C
+                      </span>
+                      <div
+                        style={{ backgroundColor: 'var(--bg-panel-alt)' }}
+                        className="p-0.5 rounded-xl flex items-center gap-0.5"
+                      >
+                        {(['c99', 'c11', 'c17'] as const).map((std) => (
+                          <button
+                            key={std}
+                            type="button"
+                            onClick={() => onUpdateCompiler({ ...compilerSettings, cStandard: std })}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase transition-all ${
+                              compilerSettings.cStandard === std
+                                ? 'accent-pill-active'
+                                : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            {std}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="px-4 py-3 space-y-1.5">
+                      <label
+                        className="block text-xs font-medium"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        Compiler API Endpoint
+                      </label>
+                      <input
+                        type="text"
+                        value={compilerSettings.pistonUrl || ''}
+                        onChange={(e) =>
+                          onUpdateCompiler({ ...compilerSettings, pistonUrl: e.target.value })
+                        }
+                        style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                        className="w-full h-9 px-3 rounded-xl text-xs font-mono outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div
-                  style={{ backgroundColor: 'var(--bg-panel)' }}
-                  className="rounded-2xl overflow-hidden divide-y divide-white/[0.06]"
-                >
-                  <div className="px-4 py-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
-                        Chế độ chạy
-                      </div>
-                      <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                        iPad/iPhone dùng Cloud + WASM
-                      </div>
-                    </div>
-                    <select
-                      value={mode}
-                      onChange={(e) => onChangeMode(e.target.value as ExecutionMode)}
-                      style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-                      className="h-8 px-2.5 rounded-xl text-xs font-medium outline-none cursor-pointer"
-                    >
-                      <option value="standalone">Cloud + WASM</option>
-                      <option value="local">Local PC Server</option>
-                    </select>
-                  </div>
-
-                  <div className="px-4 py-3 flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
-                      Chuẩn C++
-                    </span>
+                {/* Offline Clang/LLVM WASM Preload Card */}
+                {onPreloadOfflineCpp && (
+                  <div className="space-y-2">
                     <div
-                      style={{ backgroundColor: 'var(--bg-panel-alt)' }}
-                      className="p-0.5 rounded-xl flex items-center gap-0.5"
-                    >
-                      {(['gnu++14', 'gnu++17', 'gnu++20'] as const).map((std) => (
-                        <button
-                          key={std}
-                          type="button"
-                          onClick={() => onUpdateCompiler({ ...compilerSettings, cppStandard: std })}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase transition-all ${
-                            compilerSettings.cppStandard === std
-                              ? 'accent-pill-active'
-                              : 'text-[var(--text-secondary)]'
-                          }`}
-                        >
-                          {std.replace('gnu++', 'C++')}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="px-4 py-3 flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
-                      Chuẩn C
-                    </span>
-                    <div
-                      style={{ backgroundColor: 'var(--bg-panel-alt)' }}
-                      className="p-0.5 rounded-xl flex items-center gap-0.5"
-                    >
-                      {(['c99', 'c11', 'c17'] as const).map((std) => (
-                        <button
-                          key={std}
-                          type="button"
-                          onClick={() => onUpdateCompiler({ ...compilerSettings, cStandard: std })}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase transition-all ${
-                            compilerSettings.cStandard === std
-                              ? 'accent-pill-active'
-                              : 'text-[var(--text-secondary)]'
-                          }`}
-                        >
-                          {std}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="px-4 py-3 space-y-1.5">
-                    <label
-                      className="block text-xs font-medium"
+                      className="px-1 text-[11px] font-bold uppercase tracking-wider"
                       style={{ color: 'var(--text-secondary)' }}
                     >
-                      Compiler API Endpoint
-                    </label>
-                    <input
-                      type="text"
-                      value={compilerSettings.pistonUrl || ''}
-                      onChange={(e) =>
-                        onUpdateCompiler({ ...compilerSettings, pistonUrl: e.target.value })
-                      }
-                      style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-                      className="w-full h-9 px-3 rounded-xl text-xs font-mono outline-none"
-                    />
+                      Biên dịch C/C++ Ngoại tuyến (100% Offline)
+                    </div>
+                    <div
+                      style={{ backgroundColor: 'var(--bg-panel)' }}
+                      className="rounded-2xl p-4 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            <WifiOff size={14} className="text-emerald-400 shrink-0" />
+                            <span>LLVM Clang + WASI Runtime</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            Hỗ trợ <code className="font-mono">#include &lt;bits/stdc++.h&gt;</code>, nhập <code className="font-mono">cin/scanf</code> từng dòng và đọc/ghi tệp <code className="font-mono">.txt</code> trực tiếp trên chip iPad/iPhone mà không cần mạng.
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                            offlineCppState === 'ready'
+                              ? 'bg-emerald-500/15 text-emerald-400'
+                              : offlineCppState === 'loading'
+                                ? 'bg-sky-500/15 text-sky-400'
+                                : 'bg-white/10 text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          {offlineCppState === 'ready'
+                            ? 'Sẵn sàng Offline'
+                            : offlineCppState === 'loading'
+                              ? `Đang tải ${offlineCppPercent}%`
+                              : 'Chưa nạp cache'}
+                        </span>
+                      </div>
+
+                      {offlineCppState === 'loading' && (
+                        <div className="w-full h-1.5 rounded-full overflow-hidden bg-white/10">
+                          <div
+                            style={{
+                              width: `${Math.max(8, offlineCppPercent)}%`,
+                              backgroundColor: 'var(--accent-primary)'
+                            }}
+                            className="h-full rounded-full transition-all duration-300"
+                          />
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={offlineCppState === 'loading'}
+                        onClick={onPreloadOfflineCpp}
+                        className="w-full h-10 px-4 rounded-xl accent-btn text-xs font-semibold flex items-center justify-center gap-2 btn-lift disabled:opacity-60"
+                      >
+                        {offlineCppState === 'loading' ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            <span>Đang tải &amp; lưu bộ nhớ đệm ({offlineCppPercent}%)...</span>
+                          </>
+                        ) : offlineCppState === 'ready' ? (
+                          <>
+                            <Sparkles size={14} />
+                            <span>Kiểm tra / Nạp lại Clang WASM Offline</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download size={14} />
+                            <span>Tải sẵn trình biên dịch C/C++ Offline</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
             {/* ==================== TAB 4: DỮ LIỆU & THÔNG TIN ==================== */}
             {activeTab === 'data' && (
               <>
+                {onSyncDeviceFiles && (
+                  <div className="space-y-2">
+                    <div
+                      className="px-1 text-[11px] font-bold uppercase tracking-wider"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      Ứng dụng Tệp (iOS / iPadOS Files App)
+                    </div>
+
+                    <div
+                      style={{ backgroundColor: 'var(--bg-panel)' }}
+                      className="rounded-2xl overflow-hidden divide-y divide-white/[0.06]"
+                    >
+                      <IOSSwitchRow
+                        label="Tự động phản chiếu tệp ra app Tệp (Files)"
+                        description="Mỗi lần lưu, tệp tự hiện tại Tệp → Trên iPad/iPhone của tôi → Code With You"
+                        checked={iosAutoMirror}
+                        onChange={(v) => {
+                          setIosAutoMirror(v);
+                          setIosFilesAutoMirrorEnabled(v);
+                          hapticLight();
+                        }}
+                      />
+
+                      <div className="p-4 space-y-3">
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          {isNativeIosFilesSyncAvailable()
+                            ? 'Bấm Đồng bộ 2 chiều để kéo các tệp bạn mới chép vào thư mục "Code With You" trong app Tệp (Files / iCloud / AirDrop) và đẩy toàn bộ dự án hiện tại ra app Tệp.'
+                            : 'Trên app iPad/iPhone (IPA), tính năng này đồng bộ 2 chiều trực tiếp với app Tệp (Files). Trên trình duyệt máy tính (Chrome/Edge), bạn có thể chọn một thư mục cục bộ để đồng bộ.'}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={isSyncingFiles}
+                          onClick={onSyncDeviceFiles}
+                          className="w-full h-11 px-4 rounded-xl accent-btn text-xs font-semibold flex items-center justify-center gap-2 btn-lift disabled:opacity-60"
+                        >
+                          {isSyncingFiles ? (
+                            <>
+                              <RefreshCw size={15} className="animate-spin" />
+                              <span>Đang đồng bộ 2 chiều...</span>
+                            </>
+                          ) : (
+                            <>
+                              <FolderSync size={15} />
+                              <span>
+                                {isNativeIosFilesSyncAvailable()
+                                  ? 'Đồng bộ 2 chiều với app Tệp (Files)'
+                                  : 'Đồng bộ với thư mục trên thiết bị'}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <div
                     className="px-1 text-[11px] font-bold uppercase tracking-wider"
@@ -1175,7 +1437,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Code With You
                     </div>
                     <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                      Phiên bản 2.0 • iPadOS &amp; iOS Standalone IDE
+                      Phiên bản 2.5 • iPadOS &amp; iOS Standalone IDE
                     </div>
                   </div>
                 </div>

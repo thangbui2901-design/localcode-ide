@@ -1184,67 +1184,71 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </main>
 
-      {/* CLASSIC BOTTOM TAB BAR */}
-      <nav
-        style={{
-          backgroundColor: 'var(--bg-panel)',
-          borderTop: '1px solid var(--border-subtle)'
-        }}
-        className="glass-surface w-full shrink-0 select-none backdrop-blur-xl z-20"
-      >
-        <div className="relative max-w-lg mx-auto flex items-center">
-          <div
-            aria-hidden="true"
-            style={{ width: '25%' }}
-            className="absolute bottom-0 left-0 flex justify-center pointer-events-none"
-          >
-            <span
-              style={{
-                backgroundColor: 'var(--accent-primary)',
-                boxShadow: '0 0 10px var(--accent-glow)'
-              }}
-              className="w-12 h-[2.5px] rounded-full"
-            />
+      {/* FLOATING ROUNDED PILL BOTTOM TAB BAR (CHUẨN iOS CAPSULE) */}
+      <nav className="w-full shrink-0 select-none px-4 pt-1.5 pb-2.5 z-20 pointer-events-none">
+        <div
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 86%, transparent)',
+            border: '1px solid var(--border-subtle)',
+            boxShadow:
+              '0 14px 36px -10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+          }}
+          className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-2xl"
+        >
+          <div className="relative flex items-center">
+            {/* Viên thuốc nền bo tròn cho mục đang chọn */}
+            <div
+              aria-hidden="true"
+              style={{ width: '25%' }}
+              className="absolute inset-y-0 left-0 pointer-events-none"
+            >
+              <div
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--text-primary) 11%, transparent)'
+                }}
+                className="w-full h-full rounded-full"
+              />
+            </div>
+
+            <button
+              type="button"
+              style={{ color: 'var(--accent-primary)' }}
+              className="relative z-10 flex-1 h-12 rounded-full flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform"
+            >
+              <Home size={20} strokeWidth={2.25} className="ios-nav-icon-active" />
+              <span className="text-[10px] font-bold leading-none">Trang chủ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenProjects}
+              style={{ color: 'var(--text-secondary)' }}
+              className="relative z-10 flex-1 h-12 rounded-full flex flex-col items-center justify-center gap-0.5 hover:text-[var(--text-primary)] active:scale-95 transition-all"
+            >
+              <Folder size={20} strokeWidth={1.85} />
+              <span className="text-[10px] font-medium leading-none">Dự án</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onRunActive}
+              style={{ color: 'var(--text-secondary)' }}
+              className="relative z-10 flex-1 h-12 rounded-full flex flex-col items-center justify-center gap-0.5 hover:text-[var(--text-primary)] active:scale-95 transition-all"
+            >
+              <Play size={20} strokeWidth={1.85} />
+              <span className="text-[10px] font-medium leading-none">Chạy</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              style={{ color: 'var(--text-secondary)' }}
+              className="relative z-10 flex-1 h-12 rounded-full flex flex-col items-center justify-center gap-0.5 hover:text-[var(--text-primary)] active:scale-95 transition-all"
+            >
+              <MoreHorizontal size={20} strokeWidth={1.85} />
+              <span className="text-[10px] font-medium leading-none">Thêm</span>
+            </button>
           </div>
-
-          <button
-            type="button"
-            style={{ color: 'var(--accent-primary)' }}
-            className="flex-1 h-[54px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
-          >
-            <Home size={20} strokeWidth={2.25} className="ios-nav-icon-active" />
-            <span className="text-[10px] font-bold leading-none">Trang chủ</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenProjects}
-            style={{ color: 'var(--text-secondary)' }}
-            className="flex-1 h-[54px] flex flex-col items-center justify-center gap-1 hover:text-[var(--text-primary)] active:scale-95 transition-all"
-          >
-            <Folder size={20} strokeWidth={1.85} />
-            <span className="text-[10px] font-medium leading-none">Dự án</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onRunActive}
-            style={{ color: 'var(--text-secondary)' }}
-            className="flex-1 h-[54px] flex flex-col items-center justify-center gap-1 hover:text-[var(--text-primary)] active:scale-95 transition-all"
-          >
-            <Play size={20} strokeWidth={1.85} />
-            <span className="text-[10px] font-medium leading-none">Chạy</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            style={{ color: 'var(--text-secondary)' }}
-            className="flex-1 h-[54px] flex flex-col items-center justify-center gap-1 hover:text-[var(--text-primary)] active:scale-95 transition-all"
-          >
-            <MoreHorizontal size={20} strokeWidth={1.85} />
-            <span className="text-[10px] font-medium leading-none">Thêm</span>
-          </button>
         </div>
       </nav>
 

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { Search as SearchIcon, X } from 'lucide-react';
 import { WorkspaceFile } from '../types/ide';
+import { FileTypeIcon } from './FileTypeIcon';
 
 interface SearchSidebarProps {
   files: WorkspaceFile[];
@@ -12,8 +13,7 @@ interface SearchSidebarProps {
 export const SearchSidebar: React.FC<SearchSidebarProps> = ({
   files,
   onJump,
-  onCloseMobile,
-  isOverlay = false
+  onCloseMobile
 }) => {
   const [query, setQuery] = useState('');
 
@@ -22,6 +22,7 @@ export const SearchSidebar: React.FC<SearchSidebarProps> = ({
     if (!q) return [];
     const results: Array<{ file: WorkspaceFile; line: number; col: number; text: string }> = [];
     for (const file of files) {
+      if (file.language === 'asset') continue;
       const lines = file.content.split('\n');
       lines.forEach((lineText, idx) => {
         const foundIdx = lineText.toLowerCase().indexOf(q);
@@ -38,54 +39,105 @@ export const SearchSidebar: React.FC<SearchSidebarProps> = ({
     return results;
   }, [files, query]);
 
+  const fileMatchCount = useMemo(() => new Set(matches.map((m) => m.file.path)).size, [matches]);
+
   return (
-    <div
-      className={`bg-[#252526] border-r border-[#3C3C3C] flex flex-col select-none ${
-        isOverlay ? 'w-72 max-w-[82vw] h-full shadow-2xl' : 'w-64 shrink-0 h-full'
-      }`}
-    >
-      <div className="h-9 px-3 flex items-center justify-between text-[11px] tracking-wider uppercase text-[#BBBBBB] border-b border-[#3C3C3C]">
-        <span>Search</span>
-        {onCloseMobile && (
-          <button
-            onClick={onCloseMobile}
-            className="min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-[#37373D] text-[#CCCCCC]"
-          >
-            <X size={16} />
-          </button>
-        )}
-      </div>
-
-      <div className="p-2 border-b border-[#3C3C3C]">
-        <input
-          autoFocus
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm từ khóa trong các tệp..."
-          className="w-full bg-[#3C3C3C] text-white text-xs px-2.5 py-1.5 rounded border border-[#4C4C4C] focus:border-[#007ACC] outline-none"
-        />
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-1.5 space-y-1 text-xs">
-        {query.trim() && matches.length === 0 && (
-          <div className="text-[#858585] px-2 py-2">Không tìm thấy kết quả phù hợp.</div>
-        )}
-        {matches.map((m, i) => (
-          <div
-            key={i}
-            onClick={() => {
-              onJump(m.file, m.line, m.col);
-              onCloseMobile?.();
+    <div className="w-full h-full flex flex-col select-none bg-transparent overflow-hidden">
+      {/* Pill Search Input matching OutlinePanel */}
+      <div className="px-3 pb-2.5 shrink-0">
+        <div
+          style={{
+            backgroundColor: 'var(--bg-panel-alt)',
+            border: '1px solid var(--border-subtle)'
+          }}
+          className="h-9 px-2.5 rounded-xl flex items-center gap-2 transition-colors focus-within:border-[var(--accent-primary)]"
+        >
+          <SearchIcon size={13} className="shrink-0 opacity-65" style={{ color: 'var(--text-secondary)' }} />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Tìm từ khóa trong các tệp..."
+            style={{
+              backgroundColor: 'transparent',
+              color: 'var(--text-primary)'
             }}
-            className="px-2 py-1.5 rounded hover:bg-[#2A2D2E] cursor-pointer"
+            className="flex-1 min-w-0 !bg-transparent !border-none !rounded-none text-xs outline-none placeholder:opacity-60"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              style={{ color: 'var(--text-secondary)' }}
+              className="w-5 h-5 rounded-md flex items-center justify-center hover:bg-[var(--bg-hover)] shrink-0"
+              title="Xóa từ khóa"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {query.trim() && (
+          <div
+            className="mt-1.5 px-1 text-[10px] font-medium flex items-center justify-between"
+            style={{ color: 'var(--text-secondary)' }}
           >
-            <div className="text-[#007ACC] font-medium flex justify-between">
-              <span>{m.file.name}</span>
-              <span className="text-[#858585]">:{m.line}</span>
-            </div>
-            <div className="text-[#CCCCCC] truncate code-font text-[11px] mt-0.5">{m.text}</div>
+            <span>
+              {matches.length > 0
+                ? `${matches.length} kết quả trong ${fileMatchCount} tệp`
+                : 'Không tìm thấy kết quả'}
+            </span>
           </div>
-        ))}
+        )}
+      </div>
+
+      {/* Results List */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-1 text-xs">
+        {!query.trim() ? (
+          <div className="px-3 py-8 text-center text-[11px] opacity-65" style={{ color: 'var(--text-secondary)' }}>
+            Nhập tên hàm, biến hoặc đoạn code để tìm nhanh toàn dự án.
+          </div>
+        ) : matches.length === 0 ? (
+          <div className="px-3 py-6 text-center text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            Không tìm thấy kết quả phù hợp cho “{query.trim()}”.
+          </div>
+        ) : (
+          matches.map((m, i) => (
+            <button
+              key={`${m.file.path}:${m.line}:${m.col}:${i}`}
+              type="button"
+              onClick={() => {
+                onJump(m.file, m.line, m.col);
+                onCloseMobile?.();
+              }}
+              className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <FileTypeIcon fileName={m.file.name} size={13} className="shrink-0" />
+                  <span
+                    className="font-semibold text-[11px] truncate"
+                    style={{ color: 'var(--accent-primary)' }}
+                  >
+                    {m.file.name}
+                  </span>
+                </div>
+                <span
+                  className="font-mono text-[10px] shrink-0 opacity-75"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  :{m.line}
+                </span>
+              </div>
+              <div
+                className="truncate code-font text-[11px] mt-0.5 opacity-85"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                {m.text}
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );

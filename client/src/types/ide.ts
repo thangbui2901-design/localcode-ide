@@ -75,8 +75,11 @@ export interface EditorSettings {
   theme: string;
 }
 
+export type CppCompilerEngine = 'auto' | 'offline-wasm' | 'cloud';
+
 export interface CompilerSettings {
   cStandard: string;
   cppStandard: string;
   pistonUrl?: string;
+  cppEngine?: CppCompilerEngine;
 }

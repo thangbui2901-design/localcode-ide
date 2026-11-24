@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, AlertTriangle, Cloud, HardDrive, Command } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Cloud, HardDrive, Command, WifiOff, Cpu } from 'lucide-react';
 import { CompilerSettings, EditorSettings, ExecutionMode, WorkspaceFile } from '../types/ide';
 
 interface StatusBarProps {
@@ -86,6 +86,44 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           >
             <Command size={10} style={{ color: 'var(--accent-primary)' }} />
             <span>Phím tắt</span>
+          </button>
+        )}
+
+        {mode === 'standalone' && (lang === 'cpp' || lang === 'c') && (
+          <button
+            type="button"
+            onClick={() => {
+              const order: Array<NonNullable<CompilerSettings['cppEngine']>> = [
+                'auto',
+                'offline-wasm',
+                'cloud'
+              ];
+              const curr = compilerSettings.cppEngine || 'auto';
+              const next = order[(order.indexOf(curr) + 1) % order.length];
+              onChangeCompiler({ ...compilerSettings, cppEngine: next });
+            }}
+            style={{
+              backgroundColor: 'var(--bg-elevated)',
+              color:
+                compilerSettings.cppEngine === 'offline-wasm'
+                  ? '#10B981'
+                  : 'var(--text-primary)'
+            }}
+            className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+            title="Chuyển nhanh engine biên dịch C/C++ (Tự động / Offline Clang WASM / Cloud GCC)"
+          >
+            {compilerSettings.cppEngine === 'offline-wasm' ? (
+              <WifiOff size={10} />
+            ) : (
+              <Cpu size={10} style={{ color: 'var(--accent-primary)' }} />
+            )}
+            <span>
+              {compilerSettings.cppEngine === 'offline-wasm'
+                ? 'Offline Clang'
+                : compilerSettings.cppEngine === 'cloud'
+                  ? 'Cloud GCC'
+                  : 'Auto C/C++'}
+            </span>
           </button>
         )}
 

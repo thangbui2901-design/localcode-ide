@@ -189,7 +189,13 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
         backgroundColor: 'var(--bg-panel)',
         color: 'var(--text-primary)'
       }}
-      className={`flex flex-col ${isSheet ? (expanded ? 'h-[80vh]' : 'h-[52vh]') : 'h-full min-h-0'}`}
+      className={`flex flex-col ${
+        isSheet
+          ? expanded
+            ? 'h-[78dvh] max-h-[calc(100dvh-56px)]'
+            : 'h-[54dvh] max-h-[calc(100dvh-64px)]'
+          : 'h-full min-h-0'
+      }`}
     >
       {/* Unified Sleek Header */}
       <div

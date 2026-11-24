@@ -51,7 +51,12 @@ import {
   renameIdbEntry,
   saveIdbFile
 } from './services/indexedDbWorkspace';
-import { executeWithPiston, terminateCloudExecution } from './services/pistonRunner';
+import {
+  executeWithPiston,
+  isOfflineCppPreloaded,
+  preloadOfflineCppCompiler,
+  terminateCloudExecution
+} from './services/pistonRunner';
 import { ExplorerSidebar } from './components/ExplorerSidebar';
 import { SearchSidebar } from './components/SearchSidebar';
 import { CodeEditor } from './components/CodeEditor';
@@ -73,7 +78,8 @@ import { DiffViewerModal } from './components/ipad/DiffViewerModal';
 import { VirtualTrackpad } from './components/ipad/VirtualTrackpad';
 import { KeyboardShortcutsHud } from './components/ipad/KeyboardShortcutsHud';
 import { DropZoneOverlay } from './components/ipad/DropZoneOverlay';
-import { IpadFloatingDock, IpadRightTool } from './components/ipad/IpadFloatingDock';
+import { LeftActivityPill } from './components/ipad/LeftActivityPill';
+import { IpadRightTool } from './components/ipad/IpadFloatingDock';
 import { downloadZipArchive } from './utils/zipExporter';
 import {
   ACCENT_PRESETS,
@@ -86,76 +92,22 @@ import {
   ensurePointerOriginTracker,
   runThemeRippleTransition
 } from './utils/themeTransition';
+import {
+  hapticError,
+  hapticLight,
+  hapticMedium,
+  hapticSelection,
+  hapticSuccess,
+  hapticWarning,
+  isHapticsEnabled,
+  isNativeIosFilesSyncAvailable,
+  setHapticsEnabled,
+  syncWorkspaceWithDeviceFiles
+} from './utils/iosNative';
+import { UI_THEMES, UiThemeId, getThemeById } from './utils/themes';
 
-export type UiThemeId =
-  | 'midnight-indigo'
-  | 'cyber-emerald'
-  | 'dracula-neon'
-  | 'vscode-dark'
-  | 'lavender-light'
-  | 'solarized-light';
-
+export type { UiThemeId };
 export type UiDensity = 'bento' | 'compact';
-
-interface ThemeOption {
-  id: UiThemeId;
-  name: string;
-  mode: 'dark' | 'light';
-  bgSwatch: string;
-  accentSwatch: string;
-  monacoTheme: string;
-}
-
-const UI_THEMES: ThemeOption[] = [
-  {
-    id: 'midnight-indigo',
-    name: 'Midnight Navy',
-    mode: 'dark',
-    bgSwatch: '#0D1326',
-    accentSwatch: '#3B82F6',
-    monacoTheme: 'vs-dark-modern'
-  },
-  {
-    id: 'cyber-emerald',
-    name: 'Cyber Emerald',
-    mode: 'dark',
-    bgSwatch: '#0C1714',
-    accentSwatch: '#10B981',
-    monacoTheme: 'vs-dark-modern'
-  },
-  {
-    id: 'dracula-neon',
-    name: 'Dracula Neon',
-    mode: 'dark',
-    bgSwatch: '#1B1C26',
-    accentSwatch: '#BD93F9',
-    monacoTheme: 'vs-dark-modern'
-  },
-  {
-    id: 'vscode-dark',
-    name: 'VS Code Dark+',
-    mode: 'dark',
-    bgSwatch: '#1E1E1E',
-    accentSwatch: '#0EA5E9',
-    monacoTheme: 'vs-dark-modern'
-  },
-  {
-    id: 'lavender-light',
-    name: 'Lavender Daylight',
-    mode: 'light',
-    bgSwatch: '#FFFFFF',
-    accentSwatch: '#6D4AFF',
-    monacoTheme: 'code-ide-light'
-  },
-  {
-    id: 'solarized-light',
-    name: 'Solarized Paper',
-    mode: 'light',
-    bgSwatch: '#FDF6E3',
-    accentSwatch: '#D97706',
-    monacoTheme: 'code-ide-light'
-  }
-];
 
 function getAllMonacoNamespaces(): Array<typeof monaco> {
   const namespaces: Array<typeof monaco> = [];
@@ -180,8 +132,9 @@ function applyEnhancedEditorBehavior(_editor: monaco.editor.ICodeEditor) {
 }
 
 function applyMonacoThemeForUi(themeId: UiThemeId, accentOverride?: string) {
-  const themeMeta = UI_THEMES.find((t) => t.id === themeId) || UI_THEMES[0];
+  const themeMeta = getThemeById(themeId);
   const accentHex = accentOverride || themeMeta.accentSwatch;
+  const syn = themeMeta.syntax;
   getAllMonacoNamespaces().forEach((m) => {
     try {
       if (themeMeta.mode === 'dark') {
@@ -189,20 +142,21 @@ function applyMonacoThemeForUi(themeId: UiThemeId, accentOverride?: string) {
           base: 'vs-dark',
           inherit: true,
           rules: [
-            { token: 'comment', foreground: '6E7191', fontStyle: 'italic' },
-            { token: 'keyword', foreground: 'A78BFA', fontStyle: 'bold' },
-            { token: 'string', foreground: '5EEAD4' },
-            { token: 'number', foreground: 'F472B6' },
-            { token: 'type', foreground: '38BDF8' }
+            { token: 'comment', foreground: syn.comment, fontStyle: 'italic' },
+            { token: 'keyword', foreground: syn.keyword, fontStyle: 'bold' },
+            { token: 'string', foreground: syn.string },
+            { token: 'number', foreground: syn.number },
+            { token: 'type', foreground: syn.type }
           ],
           colors: {
             'editor.background': themeMeta.bgSwatch,
-            'editor.foreground': '#ECEAF8',
+            'editor.foreground': syn.foreground,
             'editor.lineHighlightBackground': '#FFFFFF0B',
             'editor.selectionBackground': `${accentHex}44`,
             'editorCursor.foreground': accentHex,
-            'editorLineNumber.foreground': '#5C5F7A',
-            'editorLineNumber.activeForeground': accentHex
+            'editorLineNumber.foreground': syn.lineNumber,
+            'editorLineNumber.activeForeground': accentHex,
+            focusBorder: '#00000000'
           }
         });
         m.editor.setTheme('vs-dark-modern');
@@ -211,20 +165,21 @@ function applyMonacoThemeForUi(themeId: UiThemeId, accentOverride?: string) {
           base: 'vs',
           inherit: true,
           rules: [
-            { token: 'comment', foreground: '8C89A6', fontStyle: 'italic' },
-            { token: 'keyword', foreground: '6D4AFF', fontStyle: 'bold' },
-            { token: 'string', foreground: '0D9488' },
-            { token: 'number', foreground: 'DB2777' },
-            { token: 'type', foreground: '0284C7' }
+            { token: 'comment', foreground: syn.comment, fontStyle: 'italic' },
+            { token: 'keyword', foreground: syn.keyword, fontStyle: 'bold' },
+            { token: 'string', foreground: syn.string },
+            { token: 'number', foreground: syn.number },
+            { token: 'type', foreground: syn.type }
           ],
           colors: {
             'editor.background': themeMeta.bgSwatch,
-            'editor.foreground': '#17162B',
+            'editor.foreground': syn.foreground,
             'editor.lineHighlightBackground': '#00000008',
             'editor.selectionBackground': `${accentHex}28`,
             'editorCursor.foreground': accentHex,
-            'editorLineNumber.foreground': '#9E9BB8',
-            'editorLineNumber.activeForeground': accentHex
+            'editorLineNumber.foreground': syn.lineNumber,
+            'editorLineNumber.activeForeground': accentHex,
+            focusBorder: '#00000000'
           }
         });
         m.editor.setTheme('code-ide-light');
@@ -317,6 +272,20 @@ export default function App() {
     return saved === null ? true : saved === 'true';
   });
 
+  const [hapticsEnabled, setHapticsEnabledState] = useState<boolean>(() => isHapticsEnabled());
+  const [isSyncingFiles, setIsSyncingFiles] = useState<boolean>(false);
+  const [offlineCppState, setOfflineCppState] = useState<'idle' | 'loading' | 'ready'>(() =>
+    isOfflineCppPreloaded() ? 'ready' : 'idle'
+  );
+  const [offlineCppPercent, setOfflineCppPercent] = useState<number>(() =>
+    isOfflineCppPreloaded() ? 100 : 0
+  );
+
+  const handleChangeHapticsEnabled = useCallback((enabled: boolean) => {
+    setHapticsEnabled(enabled);
+    setHapticsEnabledState(enabled);
+  }, []);
+
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [showHomeScreen, setShowHomeScreen] = useState<boolean>(true);
@@ -330,6 +299,7 @@ export default function App() {
   }, []);
 
   const handleChangeUiTheme = useCallback((nextTheme: UiThemeId) => {
+    hapticSelection();
     runThemeRippleTransition(() => {
       document.documentElement.setAttribute('data-ui-theme', nextTheme);
       setUiTheme(nextTheme);
@@ -485,6 +455,41 @@ export default function App() {
     const saved = Number(localStorage.getItem('codeide_sidebar_width'));
     return saved >= 195 && saved <= 420 ? saved : 256;
   });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [isResizingRightPanel, setIsResizingRightPanel] = useState(false);
+  const [isResizingBottom, setIsResizingBottom] = useState(false);
+  const [renderedSidebarView, setRenderedSidebarView] = useState<'explorer' | 'search' | 'outline'>(
+    'explorer'
+  );
+  const [renderedRightKind, setRenderedRightKind] = useState<'scratchpad' | 'notes' | 'console'>(
+    'scratchpad'
+  );
+  const [tabletDrawerMounted, setTabletDrawerMounted] = useState(false);
+  const [tabletDrawerVisible, setTabletDrawerVisible] = useState(false);
+
+  useEffect(() => {
+    if (sidebarView) {
+      setRenderedSidebarView(sidebarView);
+    }
+  }, [sidebarView]);
+
+  useEffect(() => {
+    if (breakpoint !== 'tablet') {
+      setTabletDrawerMounted(false);
+      setTabletDrawerVisible(false);
+      return;
+    }
+    if (sidebarView) {
+      setTabletDrawerMounted(true);
+      const raf = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setTabletDrawerVisible(true));
+      });
+      return () => window.cancelAnimationFrame(raf);
+    }
+    setTabletDrawerVisible(false);
+    const t = window.setTimeout(() => setTabletDrawerMounted(false), 300);
+    return () => window.clearTimeout(t);
+  }, [sidebarView, breakpoint]);
   const [splitRatio, setSplitRatio] = useState<number>(() => {
     const saved = Number(localStorage.getItem('codeide_split_ratio'));
     return saved >= 25 && saved <= 75 ? saved : 50;
@@ -497,6 +502,14 @@ export default function App() {
     return saved >= 280 && saved <= 680 ? saved : 390;
   });
   const [ipadRightTool, setIpadRightTool] = useState<IpadRightTool>(null);
+
+  useEffect(() => {
+    if (ipadRightTool) {
+      setRenderedRightKind(ipadRightTool);
+    } else if (bottomOpen && consoleDock === 'right') {
+      setRenderedRightKind('console');
+    }
+  }, [ipadRightTool, bottomOpen, consoleDock]);
   const [diffOpen, setDiffOpen] = useState(false);
   const [fileSnapshots, setFileSnapshots] = useState<Record<string, string>>({});
   const [trackpadOpen, setTrackpadOpen] = useState(false);
@@ -567,6 +580,7 @@ export default function App() {
     e.preventDefault();
     const startY = e.clientY;
     const startH = bottomHeight;
+    setIsResizingBottom(true);
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       const delta = startY - moveEvent.clientY;
@@ -575,6 +589,7 @@ export default function App() {
     };
 
     const onPointerUp = () => {
+      setIsResizingBottom(false);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
@@ -589,6 +604,7 @@ export default function App() {
     e.preventDefault();
     const startX = e.clientX;
     const startW = sidebarWidth;
+    setIsResizingSidebar(true);
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       const nextW = Math.min(420, Math.max(195, startW + (moveEvent.clientX - startX)));
@@ -596,6 +612,7 @@ export default function App() {
     };
 
     const onPointerUp = () => {
+      setIsResizingSidebar(false);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
@@ -610,6 +627,7 @@ export default function App() {
     e.preventDefault();
     const startX = e.clientX;
     const startW = rightPanelWidth;
+    setIsResizingRightPanel(true);
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       const nextW = Math.min(680, Math.max(280, startW + (startX - moveEvent.clientX)));
@@ -617,6 +635,7 @@ export default function App() {
     };
 
     const onPointerUp = () => {
+      setIsResizingRightPanel(false);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
@@ -671,6 +690,7 @@ export default function App() {
   }, [editorSettings.hardwareKeyboardMode]);
 
   const handleToggleHardwareKeyboardMode = useCallback(() => {
+    hapticSelection();
     setEditorSettings((prev) => {
       const next = !prev.hardwareKeyboardMode;
       showToast(
@@ -683,10 +703,18 @@ export default function App() {
     });
   }, [showToast]);
 
-  const [compilerSettings, setCompilerSettings] = useState<CompilerSettings>({
-    cStandard: 'c11',
-    cppStandard: 'gnu++17',
-    pistonUrl: 'https://emkc.org/api/v2/piston/execute'
+  const [compilerSettings, setCompilerSettings] = useState<CompilerSettings>(() => {
+    const savedEngine = localStorage.getItem('codeide_cpp_engine');
+    const cppEngine =
+      savedEngine === 'offline-wasm' || savedEngine === 'cloud' || savedEngine === 'auto'
+        ? savedEngine
+        : 'auto';
+    return {
+      cStandard: localStorage.getItem('codeide_c_standard') || 'c11',
+      cppStandard: localStorage.getItem('codeide_cpp_standard') || 'gnu++17',
+      pistonUrl: 'https://emkc.org/api/v2/piston/execute',
+      cppEngine
+    };
   });
 
   useEffect(() => {
@@ -707,6 +735,30 @@ export default function App() {
     document.documentElement.setAttribute('data-ui-theme', uiTheme);
     document.documentElement.setAttribute('data-ui-density', uiDensity);
     document.documentElement.classList.toggle('dark', currentThemeObj.mode === 'dark');
+    document.documentElement.style.colorScheme = currentThemeObj.mode;
+
+    // Đồng bộ màu thanh trạng thái iOS/iPadOS & Safari theo Dark / Light theme
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', currentThemeObj.bgSwatch);
+    }
+    const iosStatusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (iosStatusMeta) {
+      iosStatusMeta.setAttribute(
+        'content',
+        currentThemeObj.mode === 'light' ? 'default' : 'black-translucent'
+      );
+    }
+    try {
+      const capStatusBar = (window as any).Capacitor?.Plugins?.StatusBar;
+      if (capStatusBar?.setStyle) {
+        void capStatusBar.setStyle({
+          style: currentThemeObj.mode === 'light' ? 'LIGHT' : 'DARK'
+        });
+      }
+    } catch {
+      // Bỏ qua nếu chạy trên trình duyệt web thông thường
+    }
 
     setEditorSettings((prev) => ({ ...prev, theme: currentThemeObj.monacoTheme }));
     applyMonacoThemeForUi(uiTheme);
@@ -851,7 +903,23 @@ export default function App() {
 
       if (cancelled) return;
       setMode(detectedMode);
-      const loaded = await loadWorkspaceForMode(detectedMode);
+      let loaded = await loadWorkspaceForMode(detectedMode);
+
+      // Trên ứng dụng iOS/iPadOS (Capacitor), đồng bộ thầm lặng 2 chiều với app Tệp (Files) ngay khi mở app
+      if (detectedMode === 'standalone' && isNativeIosFilesSyncAvailable()) {
+        try {
+          const syncRes = await syncWorkspaceWithDeviceFiles(loaded, saveIdbFile, createIdbFolder, {
+            allowWebPicker: false
+          });
+          if (!cancelled && syncRes.pulled > 0) {
+            loaded = await loadWorkspaceForMode('standalone');
+          }
+        } catch {
+          // Bỏ qua nếu iOS chưa cấp quyền sẵn
+        }
+      }
+
+      if (cancelled) return;
       if (loaded.length > 0) {
         const initialTabs = loaded.slice(0, 4).map((f) => f.path);
         setOpenTabPaths(initialTabs);
@@ -899,6 +967,7 @@ export default function App() {
 
   const openFileInActivePane = useCallback(
     (file: WorkspaceFile) => {
+      hapticSelection();
       flushLiveContent();
       if (!openTabPaths.includes(file.path)) {
         setOpenTabPaths((prev) => [...prev, file.path]);
@@ -970,6 +1039,7 @@ export default function App() {
       }
 
       if (manualTrigger) {
+        hapticLight();
         showToast(`Đã lưu ${target.name}`, 'success');
       }
     },
@@ -1062,6 +1132,7 @@ export default function App() {
 
   const handleRun = async () => {
     if (!activeFile || isRunning) return;
+    hapticMedium();
 
     const liveContent =
       activeFile.language === 'asset'
@@ -1268,6 +1339,7 @@ export default function App() {
             }
 
             if (waitingForInput && !forceEof) {
+              hapticLight();
               setIsWaitingForInput(true);
               if (chunksToAdd.length > 0) {
                 setLogs((prev) => [...prev, ...chunksToAdd]);
@@ -1275,6 +1347,15 @@ export default function App() {
             } else {
               interactiveSessionRef.current = null;
               setIsWaitingForInput(false);
+              if (code === 0) {
+                hapticSuccess();
+              } else {
+                hapticError();
+              }
+              if (isOfflineCppPreloaded()) {
+                setOfflineCppState('ready');
+                setOfflineCppPercent(100);
+              }
               chunksToAdd.push({
                 type: 'status',
                 text: `\n[Hoàn thành với mã ${code} trong ${elapsedMs}ms]\n`
@@ -1389,7 +1470,15 @@ export default function App() {
       ));
 
   const handleUpdateCompiler = async (next: CompilerSettings) => {
+    hapticSelection();
     setCompilerSettings(next);
+    try {
+      localStorage.setItem('codeide_cpp_standard', next.cppStandard);
+      localStorage.setItem('codeide_c_standard', next.cStandard);
+      if (next.cppEngine) localStorage.setItem('codeide_cpp_engine', next.cppEngine);
+    } catch {
+      // ignore
+    }
     if (mode === 'local') {
       await fetch('/api/compiler-config', {
         method: 'POST',
@@ -1398,6 +1487,64 @@ export default function App() {
       });
     }
   };
+
+  const handleSyncDeviceFiles = useCallback(async () => {
+    if (isSyncingFiles) return;
+    flushLiveContent();
+    hapticLight();
+    setIsSyncingFiles(true);
+    try {
+      const latestSnap = files.map((f) => ({
+        ...f,
+        content: liveContentMapRef.current[f.path] ?? f.content
+      }));
+      const res = await syncWorkspaceWithDeviceFiles(latestSnap, saveIdbFile, createIdbFolder, {
+        allowWebPicker: true
+      });
+      if (res.mode === 'unsupported') {
+        hapticWarning();
+        showToast('Trình duyệt hiện tại chưa hỗ trợ chọn thư mục — hãy dùng app iOS/iPadOS (.ipa) hoặc Chrome/Edge', 'info');
+        return;
+      }
+      if (res.pulled > 0) {
+        await loadWorkspaceForMode('standalone');
+      }
+      hapticSuccess();
+      if (res.pushed === 0 && res.pulled === 0) {
+        showToast(`Mọi tệp đã đồng bộ khớp với ${res.folderName || 'app Tệp'}`, 'success');
+      } else {
+        showToast(
+          `Đồng bộ ${res.folderName || 'app Tệp'}: ↑${res.pushed} đẩy ra, ↓${res.pulled} kéo vào`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        hapticError();
+        showToast(`Lỗi đồng bộ tệp: ${err?.message || 'Không xác định'}`, 'error');
+      }
+    } finally {
+      setIsSyncingFiles(false);
+    }
+  }, [files, flushLiveContent, isSyncingFiles, loadWorkspaceForMode, showToast]);
+
+  const handlePreloadOfflineCpp = useCallback(async () => {
+    if (offlineCppState === 'loading') return;
+    hapticLight();
+    setOfflineCppState('loading');
+    setOfflineCppPercent(5);
+    try {
+      await preloadOfflineCppCompiler((pct) => setOfflineCppPercent(pct));
+      setOfflineCppState('ready');
+      setOfflineCppPercent(100);
+      hapticSuccess();
+      showToast('Trình biên dịch C/C++ Offline Clang WASM đã sẵn sàng!', 'success');
+    } catch (err: any) {
+      setOfflineCppState(isOfflineCppPreloaded() ? 'ready' : 'idle');
+      hapticError();
+      showToast(err?.message || 'Không thể tải trình biên dịch Clang WASM', 'error');
+    }
+  }, [offlineCppState, showToast]);
 
   const handleCreateFile = async (relPath: string) => {
     flushLiveContent();
@@ -1437,6 +1584,7 @@ export default function App() {
   };
 
   const handleDeleteEntry = async (relPath: string) => {
+    hapticWarning();
     delete liveContentMapRef.current[relPath];
     if (mode === 'local') {
       await fetch('/api/entry', {
@@ -1633,6 +1781,7 @@ export default function App() {
   };
 
   const handleToggleSplit = () => {
+    hapticSelection();
     flushLiveContent();
     setSplitOpen((prev) => {
       const next = !prev;
@@ -1676,6 +1825,7 @@ export default function App() {
       activeEditorRef.current?.getAction('editor.action.formatDocument')?.run();
     }
     showToast(`Đã căn chỉnh ${activeFile.name}`, 'success');
+    hapticLight();
   };
 
   const handleExportBackup = async () => {
@@ -2037,9 +2187,15 @@ export default function App() {
 
   const handleRunSingleTest = async (tc: TestCaseItem) => {
     if (isRunningTests) return;
+    hapticMedium();
     setIsRunningTests(true);
     try {
       const res = await executeSingleTestCase(tc);
+      if (res.status === 'ac') {
+        hapticSuccess();
+      } else {
+        hapticError();
+      }
       showToast(
         res.status === 'ac'
           ? `${tc.name}: AC (${res.elapsedMs}ms)`
@@ -2055,6 +2211,7 @@ export default function App() {
 
   const handleRunAllTests = async () => {
     if (isRunningTests || activeTestCases.length === 0) return;
+    hapticMedium();
     setIsRunningTests(true);
     let passed = 0;
     try {
@@ -2064,7 +2221,10 @@ export default function App() {
       }
       const allPassed = passed === activeTestCases.length && activeTestCases.length > 0;
       if (allPassed) {
+        hapticSuccess();
         setCelebrateKey((k) => k + 1);
+      } else {
+        hapticWarning();
       }
       showToast(
         allPassed
@@ -2096,6 +2256,7 @@ export default function App() {
   );
 
   const handleToggleConsoleDock = useCallback(() => {
+    hapticSelection();
     setIpadRightTool(null);
     setBottomOpen(true);
     setConsoleDock((prev) => {
@@ -2106,6 +2267,7 @@ export default function App() {
   }, [showToast]);
 
   const handleToggleRightTool = useCallback((tool: Exclude<IpadRightTool, null>) => {
+    hapticSelection();
     setShowHomeScreen(false);
     setIpadRightTool((prev) => (prev === tool ? null : tool));
   }, []);
@@ -2637,6 +2799,34 @@ export default function App() {
       }
     },
     {
+      id: 'sync-device-files',
+      title: 'Đồng bộ 2 chiều với app Tệp (Files)',
+      subtitle: 'Kéo & đẩy tệp với Trên iPad/iPhone của tôi → Code With You',
+      icon: <PaletteIcons.PanelLeft size={15} className="text-sky-400" />,
+      action: () => {
+        void handleSyncDeviceFiles();
+      }
+    },
+    {
+      id: 'toggle-offline-cpp',
+      title:
+        compilerSettings.cppEngine === 'offline-wasm'
+          ? 'Chuyển C/C++ về chế độ Tự động (Cloud + Offline)'
+          : 'Bật biên dịch C/C++ 100% Offline (LLVM Clang WASM)',
+      subtitle: 'Biên dịch C/C++ ngay trên máy không cần Wi-Fi',
+      icon: <PaletteIcons.Play size={15} className="text-emerald-400" />,
+      action: () => {
+        const next = compilerSettings.cppEngine === 'offline-wasm' ? 'auto' : 'offline-wasm';
+        void handleUpdateCompiler({ ...compilerSettings, cppEngine: next });
+        showToast(
+          next === 'offline-wasm'
+            ? 'Đã bật C/C++ 100% Offline (LLVM Clang WASM)'
+            : 'Đã chuyển C/C++ sang chế độ Tự động (Cloud + Offline)',
+          'info'
+        );
+      }
+    },
+    {
       id: 'open-settings',
       title: 'Mở Cài đặt Code With You',
       icon: <PaletteIcons.Settings size={15} className="text-zinc-400" />,
@@ -2736,6 +2926,13 @@ export default function App() {
           onChangeUiDensity={setUiDensity}
           typingSound={typingSound}
           onChangeTypingSound={setTypingSound}
+          hapticsEnabled={hapticsEnabled}
+          onChangeHapticsEnabled={handleChangeHapticsEnabled}
+          onSyncDeviceFiles={handleSyncDeviceFiles}
+          isSyncingFiles={isSyncingFiles}
+          onPreloadOfflineCpp={handlePreloadOfflineCpp}
+          offlineCppState={offlineCppState}
+          offlineCppPercent={offlineCppPercent}
           visualPrefs={visualPrefs}
           onUpdateVisualPrefs={handleUpdateVisualPrefs}
         />
@@ -2766,7 +2963,7 @@ export default function App() {
             backgroundColor: 'var(--bg-panel)',
             borderBottom: '1px solid var(--border-subtle)'
           }}
-          className="h-13 px-3 flex items-center justify-between gap-2 shrink-0 relative z-20"
+          className="h-14 px-3 flex items-center justify-between gap-2 shrink-0 relative z-20"
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
@@ -2952,6 +3149,7 @@ export default function App() {
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   transform: sheetDragY > 0 ? `translate3d(0, ${sheetDragY}px, 0)` : undefined,
+                  animation: sheetDragY > 0 || sheetDragStartRef.current !== null ? 'none' : undefined,
                   transition: sheetDragStartRef.current === null ? 'transform 0.3s var(--ease-ios-spring)' : 'none'
                 }}
                 className="ide-card overflow-hidden ios-sheet-enter"
@@ -3025,6 +3223,13 @@ export default function App() {
           onChangeUiDensity={setUiDensity}
           typingSound={typingSound}
           onChangeTypingSound={setTypingSound}
+          hapticsEnabled={hapticsEnabled}
+          onChangeHapticsEnabled={handleChangeHapticsEnabled}
+          onSyncDeviceFiles={handleSyncDeviceFiles}
+          isSyncingFiles={isSyncingFiles}
+          onPreloadOfflineCpp={handlePreloadOfflineCpp}
+          offlineCppState={offlineCppState}
+          offlineCppPercent={offlineCppPercent}
           visualPrefs={visualPrefs}
           onUpdateVisualPrefs={handleUpdateVisualPrefs}
         />
@@ -3057,8 +3262,8 @@ export default function App() {
   const outerGapClass = zenMode
     ? 'p-4 sm:p-8 gap-0'
     : uiDensity === 'compact'
-      ? 'gap-0'
-      : 'p-2 gap-2';
+      ? 'px-2 pb-1.5 pt-1 gap-1.5'
+      : 'px-3 pb-2 pt-1.5 gap-2.5';
   const showRightConsoleDock =
     bottomOpen && consoleDock === 'right' && (breakpoint === 'desktop' || width >= 900);
   const showRightPanel = !zenMode && (ipadRightTool !== null || showRightConsoleDock);
@@ -3122,74 +3327,62 @@ export default function App() {
         </div>
       )}
 
-      {/* SLEEK UNIFIED TOP HEADER (CURSOR / SWIFT PLAYGROUNDS STYLE) */}
+      {/* FRAMELESS LIQUID-GLASS TOP CHROME HEADER (GIỐNG ẢNH MẪU) */}
       {!zenMode && (
-      <header
-        style={{
-          backgroundColor: 'var(--bg-panel)',
-          borderBottom: uiDensity === 'compact' ? '1px solid var(--border-subtle)' : undefined
-        }}
-        className={`${uiDensity === 'compact' ? 'glass-surface' : 'ide-card'} h-12 px-3 flex items-center justify-between gap-3 shrink-0 relative z-30`}
-      >
-        {/* Left: Home Logo + Sidebar + Split toggle */}
+      <header className="h-11 px-1 flex items-center justify-between gap-3 shrink-0 relative z-30">
+        {/* Left: Minimalist App Logo aligned over Left Pill + Split toggle */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => setShowHomeScreen(true)}
-            className="h-8 px-2 rounded-xl hover:bg-[var(--bg-elevated)] flex items-center gap-2 btn-lift"
+            className="w-11 h-9 rounded-full hover:bg-[var(--bg-panel)] flex items-center justify-center transition-colors btn-lift"
             title="Về Trang chủ (Home)"
           >
             <img src="/app-logo.png" alt="Home" className="w-6 h-6 rounded-md object-contain" />
-            <span className="hidden xl:inline text-xs font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              Code With You
-            </span>
-          </button>
-
-          <button
-            onClick={() => setSidebarView((prev) => (prev ? null : 'explorer'))}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center btn-lift ${
-              sidebarView
-                ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/60'
-            }`}
-            title="Ẩn / Hiện thanh thư mục (⌘B)"
-          >
-            <PanelLeft size={16} />
           </button>
 
           <button
             onClick={handleToggleSplit}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center btn-lift ${
+            style={
               splitOpen
-                ? 'bg-[var(--bg-active)] text-[var(--accent-primary)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/60'
+                ? {
+                    backgroundColor: 'color-mix(in srgb, var(--text-primary) 10%, transparent)',
+                    color: 'var(--text-primary)'
+                  }
+                : undefined
+            }
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+              splitOpen
+                ? ''
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)]'
             }`}
             title="Bật / Tắt chia đôi màn hình Split View (⌘\)"
           >
-            <Columns size={16} />
+            <Columns size={15} />
           </button>
         </div>
 
-        {/* Center: Clickable Active File / Command Palette Pill */}
+        {/* Center: Sleek Full-Pill Frosted Search Bar (giống ô Search bo tròn trên đỉnh ảnh mẫu) */}
         <button
           type="button"
           onClick={() => setCommandPaletteOpen(true)}
           style={{
-            backgroundColor: 'var(--bg-panel-alt)',
+            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
             border: '1px solid var(--border-subtle)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
             color: 'var(--text-secondary)'
           }}
-          className="hidden sm:flex flex-1 max-w-md h-8 px-3 rounded-xl items-center justify-between gap-2 text-xs hover:bg-[var(--bg-elevated)] transition-colors min-w-0"
+          className="hidden sm:flex flex-1 max-w-md h-9 px-3.5 rounded-full items-center justify-between gap-2 text-xs hover:bg-[var(--bg-elevated)]/70 transition-colors min-w-0 backdrop-blur-xl"
           title="Mở Command Palette & tìm tệp nhanh (⌘P)"
         >
           <div className="flex items-center gap-2 min-w-0">
             <Search size={13} className="shrink-0 opacity-70" />
-            <span className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>
-              {activeFile?.path || 'Tìm tệp hoặc lệnh...'}
+            <span className="truncate font-normal opacity-85" style={{ color: 'var(--text-primary)' }}>
+              {activeFile?.path || 'Search files or commands...'}
             </span>
           </div>
           <kbd
             style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
-            className="px-1.5 py-0.5 rounded-md font-mono text-[10px] shrink-0"
+            className="px-2 py-0.5 rounded-full font-mono text-[10px] shrink-0"
           >
             ⌘P
           </kbd>
@@ -3222,18 +3415,18 @@ export default function App() {
                   border: '1px solid var(--border-subtle)',
                   color: 'var(--text-primary)'
                 }}
-                className="absolute right-0 mt-2 w-72 rounded-2xl p-3.5 z-50 ios-popover-enter shadow-2xl"
+                className="absolute right-0 mt-2 w-80 max-w-[90vw] max-h-[75vh] overflow-y-auto rounded-2xl p-3.5 z-50 ios-popover-enter shadow-2xl"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    Chủ đề màu sắc (Theme)
+                    Chủ đề màu sắc ({UI_THEMES.length})
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] uppercase" style={{ color: 'var(--text-secondary)' }}>
                     {currentThemeObj.mode}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 gap-1.5 mb-3.5">
+                <div className="grid grid-cols-2 gap-1.5 mb-3.5">
                   {UI_THEMES.map((t) => {
                     const selected = t.id === uiTheme;
                     return (
@@ -3244,15 +3437,15 @@ export default function App() {
                           showToast(`Theme: ${t.name}`, 'info');
                         }}
                         style={{ color: 'var(--text-primary)' }}
-                        className={`w-full px-3 py-2 rounded-xl text-left text-xs font-medium flex items-center justify-between transition-all btn-lift ${
+                        className={`w-full px-2.5 py-2 rounded-xl text-left text-[11px] font-medium flex items-center justify-between gap-1.5 transition-all btn-lift ${
                           selected
-                            ? 'bg-[var(--bg-active)]'
+                            ? 'bg-[var(--bg-active)] ring-1 ring-[var(--accent-primary)]/40'
                             : 'bg-[var(--bg-panel-alt)] hover:bg-[var(--bg-hover)]'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
                           <span
-                            className="w-5 h-5 rounded-lg flex items-center justify-center shadow-xs"
+                            className="w-5 h-5 rounded-lg flex items-center justify-center shadow-xs shrink-0 border border-black/10"
                             style={{ backgroundColor: t.bgSwatch }}
                           >
                             <span
@@ -3260,9 +3453,9 @@ export default function App() {
                               style={{ backgroundColor: t.accentSwatch }}
                             />
                           </span>
-                          <span>{t.name}</span>
+                          <span className="truncate">{t.shortName}</span>
                         </div>
-                        {selected && <Check size={14} style={{ color: t.accentSwatch }} />}
+                        {selected && <Check size={12} className="shrink-0" style={{ color: t.accentSwatch }} />}
                       </button>
                     );
                   })}
@@ -3344,7 +3537,7 @@ export default function App() {
           {isRunning ? (
             <button
               onClick={handleKill}
-              className="h-8 px-3.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-500/25 btn-lift"
+              className="h-8 px-4 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-500/25 btn-lift"
             >
               <Square size={11} fill="currentColor" />
               <span>Stop</span>
@@ -3352,7 +3545,7 @@ export default function App() {
           ) : (
             <button
               onClick={handleRun}
-              className="h-8 px-3.5 rounded-lg run-btn font-bold text-xs flex items-center gap-1.5 btn-lift"
+              className="h-8 px-4 rounded-full run-btn font-bold text-xs flex items-center gap-1.5 btn-lift"
             >
               <Play size={12} fill="currentColor" />
               <span>{isWebLanguage(activeFile?.language) ? 'Go Live' : 'Run'}</span>
@@ -3362,337 +3555,150 @@ export default function App() {
       </header>
       )}
 
-      {/* MAIN WORKSPACE */}
+      {/* MAIN WORKSPACE: LEFT PILL RAIL + ROUNDED EXPLORER + ROUNDED EDITOR + RIGHT PILL RAIL */}
       <div
         className={`flex-1 min-h-0 flex ${
-          zenMode ? 'max-w-5xl mx-auto w-full relative z-10' : uiDensity === 'compact' ? 'gap-0' : 'gap-2'
+          zenMode ? 'max-w-5xl mx-auto w-full relative z-10' : uiDensity === 'compact' ? 'gap-1.5' : 'gap-2.5'
         } relative z-10`}
       >
-        {/* LEFT EXPLORER / SEARCH / OUTLINE CARD (RESIZABLE) */}
-        {sidebarView && breakpoint === 'desktop' && (
-          <>
-            <aside
-              style={{ width: `${sidebarWidth}px` }}
-              className="shrink-0 ide-card flex flex-col overflow-hidden tab-content-enter"
-            >
-              <div
-                style={{ borderBottom: '1px solid var(--border-subtle)' }}
-                className="p-2 flex items-center justify-between gap-1 shrink-0"
-              >
-                <div className="flex-1 grid grid-cols-3 p-0.5 rounded-lg bg-[var(--bg-panel-alt)] gap-0.5">
-                  <button
-                    onClick={() => setSidebarView('explorer')}
-                    style={{
-                      backgroundColor: sidebarView === 'explorer' ? 'var(--bg-elevated)' : 'transparent',
-                      color: sidebarView === 'explorer' ? 'var(--text-primary)' : 'var(--text-secondary)'
-                    }}
-                    className="py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <FolderOpen size={12} />
-                    <span>Files</span>
-                  </button>
-                  <button
-                    onClick={() => setSidebarView('search')}
-                    style={{
-                      backgroundColor: sidebarView === 'search' ? 'var(--bg-elevated)' : 'transparent',
-                      color: sidebarView === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)'
-                    }}
-                    className="py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <Search size={12} />
-                    <span>Search</span>
-                  </button>
-                  <button
-                    onClick={() => setSidebarView('outline')}
-                    style={{
-                      backgroundColor: sidebarView === 'outline' ? 'var(--bg-elevated)' : 'transparent',
-                      color: sidebarView === 'outline' ? 'var(--text-primary)' : 'var(--text-secondary)'
-                    }}
-                    className="py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                    title="Mục lục cấu trúc code (⌘⇧O)"
-                  >
-                    <ListTree size={12} />
-                    <span>Outline</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className={`flex-1 min-h-0 overflow-hidden theme-scope ${sidebarView === 'explorer' ? 'explorer-clean' : ''}`}>
-                {sidebarView === 'explorer' ? (
-                  <ExplorerSidebar
-                    tree={tree}
-                    files={files}
-                    activeFile={activeFile}
-                    onSelectFile={openFileInActivePane}
-                    onCreateFile={handleCreateFile}
-                    onCreateFolder={handleCreateFolder}
-                    onRenameEntry={handleRenameEntry}
-                    onImportCodeFiles={handleImportCodeFiles}
-                    onDeleteEntry={handleDeleteEntry}
-                    onRefresh={() => loadWorkspaceForMode(mode)}
-                  />
-                ) : sidebarView === 'search' ? (
-                  <SearchSidebar
-                    files={files}
-                    onJump={(f, line, col) => {
-                      openFileInActivePane(f);
-                      setTimeout(() => {
-                        activeEditorRef.current?.revealLineInCenter(line);
-                        activeEditorRef.current?.setPosition({ lineNumber: line, column: col });
-                        activeEditorRef.current?.focus();
-                      }, 40);
-                    }}
-                  />
-                ) : (
-                  <OutlinePanel
-                    file={activeFile}
-                    currentLine={cursor.line}
-                    onJumpToLine={(line) => {
-                      activeEditorRef.current?.revealLineInCenter(line);
-                      activeEditorRef.current?.setPosition({ lineNumber: line, column: 1 });
-                      activeEditorRef.current?.focus();
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Quiet 1-line Sidebar Footer */}
-              <div
-                style={{
-                  borderTop: '1px solid var(--border-subtle)',
-                  color: 'var(--text-secondary)'
-                }}
-                className="h-8 px-3 flex items-center justify-between text-[11px] shrink-0"
-              >
-                <span className="truncate opacity-80">{files.length} tệp</span>
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => sidebarAssetInputRef.current?.click()}
-                    className="w-6 h-6 rounded-md hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
-                    title="Import Ảnh / Font / JSON"
-                  >
-                    <ImagePlus size={12} />
-                  </button>
-                  <input
-                    ref={sidebarAssetInputRef}
-                    type="file"
-                    multiple
-                    accept="image/*,.json,.woff,.woff2,.ttf,.otf"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        handleImportAssets(e.target.files);
-                        e.target.value = '';
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleExportBackup}
-                    className="w-6 h-6 rounded-md hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
-                    title="Sao lưu Workspace (JSON)"
-                  >
-                    <Download size={12} />
-                  </button>
-                  <label
-                    className="w-6 h-6 rounded-md hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center cursor-pointer transition-colors"
-                    title="Khôi phục Workspace (JSON)"
-                  >
-                    <Upload size={12} />
-                    <input
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleImportBackup(f);
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-            </aside>
-
-            {/* RESIZABLE SIDEBAR DIVIDER */}
-            <div
-              onPointerDown={startResizeSidebar}
-              title="Kéo trái / phải để chỉnh độ rộng Sidebar"
-              className="w-1.5 -mx-0.5 cursor-col-resize touch-none flex items-center justify-center group shrink-0"
-            >
-              <span className="w-0.5 h-12 rounded-full bg-transparent group-hover:bg-[var(--accent-primary)] transition-colors" />
-            </div>
-          </>
+        {/* SIGNATURE UNIFIED LEFT FLOATING VERTICAL PILL RAIL */}
+        {!zenMode && (
+          <LeftActivityPill
+            sidebarView={sidebarView}
+            diffOpen={diffOpen}
+            consoleDock={consoleDock}
+            bottomOpen={bottomOpen}
+            rightTool={ipadRightTool}
+            trackpadOpen={trackpadOpen}
+            hardwareKeyboardMode={Boolean(editorSettings.hardwareKeyboardMode)}
+            shortcutsHudOpen={shortcutsHudOpen}
+            onSelectSidebar={(view) => setSidebarView((prev) => (prev === view ? null : view))}
+            onToggleDiff={() => setDiffOpen((v) => !v)}
+            onToggleRightTool={handleToggleRightTool}
+            onToggleConsoleDock={handleToggleConsoleDock}
+            onToggleTrackpad={() => setTrackpadOpen((v) => !v)}
+            onToggleHardwareKeyboardMode={handleToggleHardwareKeyboardMode}
+            onOpenShortcutsHud={() => {
+              setShortcutsHudHoldMode(false);
+              setShortcutsHudOpen(true);
+            }}
+          />
         )}
 
-        {sidebarView && breakpoint === 'tablet' && (
+        {/* LEFT EXPLORER / SEARCH / OUTLINE FLOATING CARD — LIQUID-GLASS SPRING EXPAND/COLLAPSE */}
+        {breakpoint === 'desktop' && !zenMode && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex p-3 ios-backdrop-enter"
-            onClick={() => setSidebarView(null)}
+            style={{
+              width: sidebarView ? `${sidebarWidth}px` : '0px',
+              marginRight: sidebarView ? '0px' : uiDensity === 'compact' ? '-6px' : '-10px',
+              transition: isResizingSidebar
+                ? 'none'
+                : 'width 0.38s cubic-bezier(0.22, 1, 0.36, 1), margin-right 0.38s cubic-bezier(0.22, 1, 0.36, 1)'
+            }}
+            className={`shrink-0 h-full flex overflow-hidden ${sidebarView ? '' : 'pointer-events-none'}`}
           >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="h-full w-80 max-w-[85vw] ide-card flex flex-col overflow-hidden ios-drawer-enter"
+            <aside
+              style={{
+                width: `${sidebarWidth}px`,
+                opacity: sidebarView ? 1 : 0,
+                transform: sidebarView
+                  ? 'translate3d(0, 0, 0) scale(1)'
+                  : 'translate3d(-22px, 0, 0) scale(0.95)',
+                filter: sidebarView ? 'blur(0px)' : 'blur(6px)',
+                transformOrigin: 'left center',
+                transition: isResizingSidebar
+                  ? 'none'
+                  : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease, filter 0.32s ease',
+                willChange: 'transform, opacity, filter'
+              }}
+              className="shrink-0 h-full ide-card flex flex-col overflow-hidden"
             >
               <div
-                style={{ borderBottom: '1px solid var(--border-subtle)' }}
-                className="p-2 flex items-center justify-between gap-1 shrink-0"
+                key={renderedSidebarView}
+                className="flex-1 min-h-0 flex flex-col overflow-hidden sidebar-view-swap"
               >
-                <div className="flex-1 grid grid-cols-3 p-0.5 rounded-lg bg-[var(--bg-panel-alt)] gap-0.5">
-                  <button
-                    onClick={() => setSidebarView('explorer')}
-                    style={{
-                      backgroundColor: sidebarView === 'explorer' ? 'var(--bg-elevated)' : 'transparent',
-                      color: sidebarView === 'explorer' ? 'var(--text-primary)' : 'var(--text-secondary)'
-                    }}
-                    className="py-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <FolderOpen size={12} />
-                    <span>Files</span>
-                  </button>
-                  <button
-                    onClick={() => setSidebarView('search')}
-                    style={{
-                      backgroundColor: sidebarView === 'search' ? 'var(--bg-elevated)' : 'transparent',
-                      color: sidebarView === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)'
-                    }}
-                    className="py-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <Search size={12} />
-                    <span>Search</span>
-                  </button>
-                  <button
-                    onClick={() => setSidebarView('outline')}
-                    style={{
-                      backgroundColor: sidebarView === 'outline' ? 'var(--bg-elevated)' : 'transparent',
-                      color: sidebarView === 'outline' ? 'var(--text-primary)' : 'var(--text-secondary)'
-                    }}
-                    className="py-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <ListTree size={12} />
-                    <span>Outline</span>
-                  </button>
-                </div>
-              </div>
+                {renderedSidebarView !== 'explorer' && (
+                  <div className="px-4 pt-3.5 pb-2 flex items-center justify-between shrink-0">
+                    <span
+                      style={{ color: 'var(--text-primary)' }}
+                      className="text-[15px] font-medium tracking-tight"
+                    >
+                      {renderedSidebarView === 'search' ? 'Search' : 'Outline'}
+                    </span>
+                  </div>
+                )}
 
-              <div
-                className={`flex-1 min-h-0 overflow-hidden theme-scope ${
-                  sidebarView === 'explorer' ? 'explorer-clean' : ''
-                }`}
-              >
-                {sidebarView === 'explorer' ? (
-                  <ExplorerSidebar
-                    tree={tree}
-                    files={files}
-                    activeFile={activeFile}
-                    onSelectFile={(f) => {
-                      openFileInActivePane(f);
-                      setSidebarView(null);
-                    }}
-                    onCreateFile={handleCreateFile}
-                    onCreateFolder={handleCreateFolder}
-                    onRenameEntry={handleRenameEntry}
-                    onImportCodeFiles={handleImportCodeFiles}
-                    onDeleteEntry={handleDeleteEntry}
-                    onRefresh={() => loadWorkspaceForMode(mode)}
-                    onCloseMobile={() => setSidebarView(null)}
-                    isOverlay
-                  />
-                ) : sidebarView === 'search' ? (
-                  <SearchSidebar
-                    files={files}
-                    onJump={(f, line, col) => {
-                      openFileInActivePane(f);
-                      setSidebarView(null);
-                      setTimeout(() => {
-                        activeEditorRef.current?.revealLineInCenter(line);
-                        activeEditorRef.current?.setPosition({ lineNumber: line, column: col });
-                        activeEditorRef.current?.focus();
-                      }, 40);
-                    }}
-                  />
-                ) : (
-                  <OutlinePanel
-                    file={activeFile}
-                    currentLine={cursor.line}
-                    onJumpToLine={(line) => {
-                      setSidebarView(null);
-                      setTimeout(() => {
+                <div
+                  className={`flex-1 min-h-0 overflow-hidden theme-scope ${
+                    renderedSidebarView === 'explorer' ? 'explorer-clean' : ''
+                  }`}
+                >
+                  {renderedSidebarView === 'explorer' ? (
+                    <ExplorerSidebar
+                      tree={tree}
+                      files={files}
+                      activeFile={activeFile}
+                      onSelectFile={openFileInActivePane}
+                      onCreateFile={handleCreateFile}
+                      onCreateFolder={handleCreateFolder}
+                      onRenameEntry={handleRenameEntry}
+                      onImportCodeFiles={handleImportCodeFiles}
+                      onImportAssets={handleImportAssets}
+                      onExportBackup={handleExportBackup}
+                      onImportBackup={handleImportBackup}
+                      onDeleteEntry={handleDeleteEntry}
+                      onRefresh={() => loadWorkspaceForMode(mode)}
+                    />
+                  ) : renderedSidebarView === 'search' ? (
+                    <SearchSidebar
+                      files={files}
+                      onJump={(f, line, col) => {
+                        openFileInActivePane(f);
+                        setTimeout(() => {
+                          activeEditorRef.current?.revealLineInCenter(line);
+                          activeEditorRef.current?.setPosition({ lineNumber: line, column: col });
+                          activeEditorRef.current?.focus();
+                        }, 40);
+                      }}
+                    />
+                  ) : (
+                    <OutlinePanel
+                      file={activeFile}
+                      currentLine={cursor.line}
+                      onJumpToLine={(line) => {
                         activeEditorRef.current?.revealLineInCenter(line);
                         activeEditorRef.current?.setPosition({ lineNumber: line, column: 1 });
                         activeEditorRef.current?.focus();
-                      }, 40);
-                    }}
-                  />
-                )}
-              </div>
-
-              <div
-                style={{
-                  borderTop: '1px solid var(--border-subtle)',
-                  color: 'var(--text-secondary)'
-                }}
-                className="h-9 px-3 flex items-center justify-between text-[11px] shrink-0"
-              >
-                <span>{files.length} tệp</span>
-                <div className="flex items-center gap-1">
-                  <label
-                    className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center cursor-pointer"
-                    title="Import Ảnh / Font / JSON"
-                  >
-                    <ImagePlus size={13} />
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,.json,.woff,.woff2,.ttf,.otf"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files.length > 0) {
-                          handleImportAssets(e.target.files);
-                          e.target.value = '';
-                        }
                       }}
                     />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleExportBackup}
-                    className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center"
-                    title="Sao lưu Workspace"
-                  >
-                    <Download size={13} />
-                  </button>
-                  <label
-                    className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] flex items-center justify-center cursor-pointer"
-                    title="Khôi phục Workspace"
-                  >
-                    <Upload size={13} />
-                    <input
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleImportBackup(f);
-                      }}
-                    />
-                  </label>
+                  )}
                 </div>
               </div>
-            </div>
+            </aside>
+          </div>
+        )}
+
+        {/* RESIZABLE SIDEBAR DIVIDER */}
+        {sidebarView && breakpoint === 'desktop' && !zenMode && (
+          <div
+            onPointerDown={startResizeSidebar}
+            title="Kéo trái / phải để chỉnh độ rộng Sidebar"
+            className="w-1.5 -mx-1 cursor-col-resize touch-none flex items-center justify-center group shrink-0"
+          >
+            <span className="w-0.5 h-12 rounded-full bg-transparent group-hover:bg-[var(--accent-primary)] transition-colors" />
           </div>
         )}
 
         {/* RIGHT COLUMN: EDITOR (+ LIVE SERVER PREVIEW) ON TOP + TERMINAL AT BOTTOM */}
         <div className={`flex-1 min-w-0 min-h-0 flex flex-col ${uiDensity === 'compact' ? 'gap-1.5' : 'gap-2.5'}`}>
-          {/* EDITOR CARD — ARCHITECTURAL FLUSH TABS + BREADCRUMB BAR */}
+          {/* EDITOR CARD — RECESSED LIQUID-GLASS TABS (GIỐNG ẢNH MẪU) */}
           <main className="flex-1 min-w-0 min-h-0 ide-card flex flex-col overflow-hidden">
             <div
               style={{
-                backgroundColor: 'var(--bg-panel-alt)',
+                backgroundColor: 'var(--bg-panel)',
                 borderBottom: '1px solid var(--border-subtle)'
               }}
-              className="h-9 flex items-stretch justify-between shrink-0"
+              className="h-11 flex items-stretch justify-between shrink-0"
             >
               <div className="flex-1 min-w-0 flex items-stretch overflow-x-auto no-scrollbar">
                 {openTabs.map((tab) => {
@@ -3702,23 +3708,20 @@ export default function App() {
                       key={tab.path}
                       onClick={() => openFileInActivePane(tab)}
                       style={{
-                        backgroundColor: isActive ? 'var(--bg-panel)' : 'transparent',
+                        backgroundColor: isActive
+                          ? 'color-mix(in srgb, var(--text-primary) 7%, transparent)'
+                          : 'transparent',
                         color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                         borderRight: '1px solid var(--border-subtle)'
                       }}
-                      className={`group relative px-3 text-xs font-medium flex items-center gap-2 cursor-pointer shrink-0 transition-colors ${
-                        isActive ? '' : 'hover:bg-[var(--bg-elevated)]/40 hover:text-[var(--text-primary)]'
+                      className={`group relative px-4 text-[13px] flex items-center gap-2.5 cursor-pointer shrink-0 transition-colors ${
+                        isActive
+                          ? 'font-medium'
+                          : 'font-normal opacity-75 hover:opacity-100 hover:bg-[var(--bg-elevated)]/30'
                       }`}
                     >
-                      {isActive && (
-                        <span
-                          aria-hidden="true"
-                          style={{ backgroundColor: 'var(--accent-primary)' }}
-                          className="absolute top-0 left-0 right-0 h-[2px]"
-                        />
-                      )}
-                      <FileTypeIcon fileName={tab.name} size={14} />
-                      <span className="truncate max-w-[150px]">{tab.name}</span>
+                      <FileTypeIcon fileName={tab.name} size={15} />
+                      <span className="truncate max-w-[160px]">{tab.name}</span>
                       {tab.dirty && (
                         <span
                           style={{ backgroundColor: 'var(--accent-primary)' }}
@@ -3727,9 +3730,11 @@ export default function App() {
                       )}
                       <button
                         onClick={(e) => closeTab(tab.path, e)}
-                        className="p-0.5 rounded-md opacity-50 group-hover:opacity-100 hover:bg-[var(--bg-elevated)] transition-opacity"
+                        className={`p-0.5 rounded-md transition-opacity ${
+                          isActive ? 'opacity-65 hover:opacity-100' : 'opacity-0 group-hover:opacity-75 hover:!opacity-100'
+                        } hover:bg-[var(--bg-elevated)]`}
                       >
-                        <X size={12} />
+                        <X size={13} />
                       </button>
                     </div>
                   );
@@ -3738,14 +3743,29 @@ export default function App() {
                 <button
                   onClick={handleQuickNewFile}
                   style={{ color: 'var(--text-secondary)' }}
-                  className="px-2.5 hover:bg-[var(--bg-elevated)]/50 hover:text-[var(--text-primary)] transition-colors flex items-center justify-center shrink-0"
+                  className="px-3 hover:bg-[var(--bg-elevated)]/40 hover:text-[var(--text-primary)] transition-colors flex items-center justify-center shrink-0"
                   title="Tạo nhanh tệp mới"
                 >
-                  <Plus size={14} />
+                  <Plus size={15} />
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 px-2 shrink-0">
+              <div className="flex items-center gap-1 px-2.5 shrink-0">
+                {activeBreadcrumbSymbol && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarView('outline')}
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--text-primary) 5%, transparent)',
+                      color: 'var(--text-secondary)'
+                    }}
+                    className="hidden lg:inline-flex h-7 px-2.5 rounded-full text-[11px] font-mono items-center gap-1 hover:text-[var(--text-primary)] transition-colors mr-1"
+                    title="Vị trí hàm hiện tại (bấm mở Outline)"
+                  >
+                    <span>{activeBreadcrumbSymbol.name}</span>
+                  </button>
+                )}
+
                 {showLiveServerBtn && (
                   <button
                     onClick={handleToggleLiveServer}
@@ -3753,7 +3773,7 @@ export default function App() {
                       backgroundColor: livePreviewOpen ? 'var(--bg-active)' : 'transparent',
                       color: livePreviewOpen ? 'var(--accent-primary)' : 'var(--text-secondary)'
                     }}
-                    className="h-7 px-2 rounded-md text-[11px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+                    className="h-7 px-2.5 rounded-full text-[11px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
                     title="Bật / Tắt Live Server xem trước web theo thời gian thực"
                   >
                     <Radio
@@ -3767,54 +3787,14 @@ export default function App() {
                 <button
                   onClick={handleFormat}
                   style={{ color: 'var(--text-secondary)' }}
-                  className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+                  className="h-7 px-2.5 rounded-full text-[11px] font-medium flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
                   title="Định dạng mã nguồn"
                 >
-                  <Wand2 size={12} style={{ color: 'var(--accent-primary)' }} />
+                  <Wand2 size={13} />
                   <span className="hidden xl:inline">Format</span>
                 </button>
               </div>
             </div>
-
-            {/* CRISP CODE BREADCRUMB BAR (CURSOR / VS CODE STYLE) */}
-            {activeFile && !livePreviewOpen && (
-              <div
-                style={{
-                  backgroundColor: 'var(--bg-panel)',
-                  borderBottom: '1px solid var(--border-subtle)',
-                  color: 'var(--text-secondary)'
-                }}
-                className="h-6 px-3 flex items-center gap-1 text-[11px] shrink-0 overflow-x-auto no-scrollbar"
-              >
-                {activeFile.path.split('/').map((segment, idx, arr) => (
-                  <React.Fragment key={`${segment}-${idx}`}>
-                    {idx > 0 && <ChevronRight size={11} className="opacity-45 shrink-0" />}
-                    <span
-                      style={
-                        idx === arr.length - 1 ? { color: 'var(--text-primary)' } : undefined
-                      }
-                      className={idx === arr.length - 1 ? 'font-medium truncate' : 'opacity-75 truncate'}
-                    >
-                      {segment}
-                    </span>
-                  </React.Fragment>
-                ))}
-                {activeBreadcrumbSymbol && (
-                  <>
-                    <ChevronRight size={11} className="opacity-45 shrink-0" />
-                    <button
-                      type="button"
-                      onClick={() => setSidebarView('outline')}
-                      style={{ color: 'var(--accent-primary)' }}
-                      className="font-mono text-[11px] font-medium hover:underline truncate"
-                      title="Mở mục lục cấu trúc (Outline)"
-                    >
-                      {activeBreadcrumbSymbol.name}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
 
             <div
               ref={splitContainerRef}
@@ -3983,235 +3963,207 @@ export default function App() {
             )}
           </main>
 
-          {/* BOTTOM TERMINAL / CONSOLE CARD (DESKTOP WHEN DOCKED BOTTOM) */}
-          {bottomOpen && breakpoint === 'desktop' && consoleDock === 'bottom' && (
-            <section
-              style={{ height: `${bottomHeight}px` }}
-              className="w-full shrink-0 ide-card flex flex-col overflow-hidden ios-sheet-enter relative"
+          {/* BOTTOM TERMINAL / CONSOLE CARD — 2-WAY LIQUID-GLASS SPRING EXPAND/COLLAPSE */}
+          {breakpoint === 'desktop' && !zenMode && (
+            <div
+              style={{
+                height: bottomOpen && consoleDock === 'bottom' ? `${bottomHeight}px` : '0px',
+                marginTop:
+                  bottomOpen && consoleDock === 'bottom'
+                    ? '0px'
+                    : uiDensity === 'compact'
+                      ? '-6px'
+                      : '-10px',
+                transition: isResizingBottom
+                  ? 'none'
+                  : 'height 0.38s cubic-bezier(0.22, 1, 0.36, 1), margin-top 0.38s cubic-bezier(0.22, 1, 0.36, 1)'
+              }}
+              className={`w-full shrink-0 overflow-hidden ${
+                bottomOpen && consoleDock === 'bottom' ? '' : 'pointer-events-none'
+              }`}
             >
-              <div
-                onPointerDown={startResizeBottom}
-                title="Kéo lên / xuống để chỉnh chiều cao Console"
-                style={{ backgroundColor: 'var(--bg-panel-alt)' }}
-                className="h-3 w-full cursor-row-resize touch-none flex items-center justify-center group shrink-0"
+              <section
+                style={{
+                  height: `${bottomHeight}px`,
+                  opacity: bottomOpen && consoleDock === 'bottom' ? 1 : 0,
+                  transform:
+                    bottomOpen && consoleDock === 'bottom'
+                      ? 'translate3d(0, 0, 0) scale(1)'
+                      : 'translate3d(0, 20px, 0) scale(0.96)',
+                  filter: bottomOpen && consoleDock === 'bottom' ? 'blur(0px)' : 'blur(6px)',
+                  transformOrigin: 'center bottom',
+                  transition: isResizingBottom
+                    ? 'none'
+                    : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease, filter 0.3s ease',
+                  willChange: 'transform, opacity, filter'
+                }}
+                className="w-full ide-card flex flex-col overflow-hidden relative"
               >
-                <span className="w-10 h-1 rounded-full bg-[var(--bg-hover)] group-hover:bg-[var(--accent-primary)] transition-colors" />
-              </div>
+                <div
+                  onPointerDown={startResizeBottom}
+                  title="Kéo lên / xuống để chỉnh chiều cao Console"
+                  style={{ backgroundColor: 'var(--bg-panel-alt)' }}
+                  className="h-3 w-full cursor-row-resize touch-none flex items-center justify-center group shrink-0"
+                >
+                  <span className="w-10 h-1 rounded-full bg-[var(--bg-hover)] group-hover:bg-[var(--accent-primary)] transition-colors" />
+                </div>
 
-              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                <BottomPanel
-                  mode={mode}
-                  logs={logs}
-                  diagnostics={allDiagnostics}
-                  isRunning={isRunning}
-                  lastElapsedMs={lastElapsedMs}
-                  stdinPreset={stdinPreset}
-                  autoEof={autoEof}
-                  testCases={activeTestCases}
-                  testResults={activeTestResults}
-                  isRunningTests={isRunningTests}
-                  onChangeTestCases={handleChangeActiveTestCases}
-                  onRunAllTests={handleRunAllTests}
-                  onRunSingleTest={handleRunSingleTest}
-                  onChangeStdinPreset={setStdinPreset}
-                  onChangeAutoEof={setAutoEof}
-                  onRunWithInput={handleRun}
-                  onSendStdin={handleSendStdin}
-                  onSendEof={handleSendEof}
-                  isWaitingForInput={isWaitingForInput}
-                  hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
-                  onKill={handleKill}
-                  onClear={() => {
-                    setLogs([]);
-                    setLastElapsedMs(null);
-                  }}
-                  onJumpToDiagnostic={(d) => {
-                    const found = files.find((f) => f.uri === d.uri);
-                    if (found) openFileInActivePane(found);
-                    setTimeout(() => {
-                      activeEditorRef.current?.revealLineInCenter(d.line);
-                      activeEditorRef.current?.setPosition({ lineNumber: d.line, column: d.column });
-                      activeEditorRef.current?.focus();
-                    }, 40);
-                  }}
-                  onClose={() => setBottomOpen(false)}
-                  dockPosition={consoleDock}
-                  onToggleDockPosition={handleToggleConsoleDock}
-                  requestedTab={requestedConsoleTab}
-                />
-              </div>
-            </section>
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                  <BottomPanel
+                    mode={mode}
+                    logs={logs}
+                    diagnostics={allDiagnostics}
+                    isRunning={isRunning}
+                    lastElapsedMs={lastElapsedMs}
+                    stdinPreset={stdinPreset}
+                    autoEof={autoEof}
+                    testCases={activeTestCases}
+                    testResults={activeTestResults}
+                    isRunningTests={isRunningTests}
+                    onChangeTestCases={handleChangeActiveTestCases}
+                    onRunAllTests={handleRunAllTests}
+                    onRunSingleTest={handleRunSingleTest}
+                    onChangeStdinPreset={setStdinPreset}
+                    onChangeAutoEof={setAutoEof}
+                    onRunWithInput={handleRun}
+                    onSendStdin={handleSendStdin}
+                    onSendEof={handleSendEof}
+                    isWaitingForInput={isWaitingForInput}
+                    hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
+                    onKill={handleKill}
+                    onClear={() => {
+                      setLogs([]);
+                      setLastElapsedMs(null);
+                    }}
+                    onJumpToDiagnostic={(d) => {
+                      const found = files.find((f) => f.uri === d.uri);
+                      if (found) openFileInActivePane(found);
+                      setTimeout(() => {
+                        activeEditorRef.current?.revealLineInCenter(d.line);
+                        activeEditorRef.current?.setPosition({ lineNumber: d.line, column: d.column });
+                        activeEditorRef.current?.focus();
+                      }, 40);
+                    }}
+                    onClose={() => setBottomOpen(false)}
+                    dockPosition={consoleDock}
+                    onToggleDockPosition={handleToggleConsoleDock}
+                    requestedTab={requestedConsoleTab}
+                  />
+                </div>
+              </section>
+            </div>
           )}
         </div>
 
-        {/* IPAD PRO RIGHT UTILITY PANEL: PENCIL SCRATCHPAD / PROBLEM NOTES / RIGHT-DOCKED CONSOLE */}
+        {/* IPAD PRO RIGHT UTILITY PANEL — 2-WAY LIQUID-GLASS SPRING EXPAND/COLLAPSE */}
         {showRightPanel && (
-          <>
-            <div
-              onPointerDown={startResizeRightPanel}
-              title="Kéo trái / phải để chỉnh độ rộng khung bên phải"
-              className="w-1.5 -mx-0.5 cursor-col-resize touch-none flex items-center justify-center group shrink-0"
-            >
-              <span className="w-0.5 h-12 rounded-full bg-transparent group-hover:bg-[var(--accent-primary)] transition-colors" />
-            </div>
-
-            <aside
-              style={{ width: `${Math.min(rightPanelWidth, Math.max(280, width - 320))}px` }}
-              className="shrink-0 ide-card flex flex-col overflow-hidden tab-content-enter"
-            >
-              {ipadRightTool === 'scratchpad' ? (
-                <PencilScratchpad
-                  projectKey={projectKey}
-                  onClose={() => setIpadRightTool(null)}
-                  onExportToast={(msg) => showToast(msg, 'success')}
-                />
-              ) : ipadRightTool === 'notes' ? (
-                <ProblemNotesPane
-                  projectKey={projectKey}
-                  onSendSampleToTests={handleSendSampleToTests}
-                  onClose={() => setIpadRightTool(null)}
-                />
-              ) : (
-                <BottomPanel
-                  mode={mode}
-                  logs={logs}
-                  diagnostics={allDiagnostics}
-                  isRunning={isRunning}
-                  lastElapsedMs={lastElapsedMs}
-                  stdinPreset={stdinPreset}
-                  autoEof={autoEof}
-                  testCases={activeTestCases}
-                  testResults={activeTestResults}
-                  isRunningTests={isRunningTests}
-                  onChangeTestCases={handleChangeActiveTestCases}
-                  onRunAllTests={handleRunAllTests}
-                  onRunSingleTest={handleRunSingleTest}
-                  onChangeStdinPreset={setStdinPreset}
-                  onChangeAutoEof={setAutoEof}
-                  onRunWithInput={handleRun}
-                  onSendStdin={handleSendStdin}
-                  onSendEof={handleSendEof}
-                  isWaitingForInput={isWaitingForInput}
-                  hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
-                  onKill={handleKill}
-                  onClear={() => {
-                    setLogs([]);
-                    setLastElapsedMs(null);
-                  }}
-                  onJumpToDiagnostic={(d) => {
-                    const found = files.find((f) => f.uri === d.uri);
-                    if (found) openFileInActivePane(found);
-                    setTimeout(() => {
-                      activeEditorRef.current?.revealLineInCenter(d.line);
-                      activeEditorRef.current?.setPosition({ lineNumber: d.line, column: d.column });
-                      activeEditorRef.current?.focus();
-                    }, 40);
-                  }}
-                  onClose={() => setBottomOpen(false)}
-                  dockPosition={consoleDock}
-                  onToggleDockPosition={handleToggleConsoleDock}
-                  requestedTab={requestedConsoleTab}
-                />
-              )}
-            </aside>
-          </>
-        )}
-
-        {/* TABLET CONSOLE SHEET (VUỐT XUỐNG ĐỂ ĐÓNG - KHI KHÔNG GẮN PHẢI) */}
-        {bottomOpen && breakpoint === 'tablet' && !showRightConsoleDock && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex flex-col justify-end p-3 ios-backdrop-enter"
-            onClick={() => setBottomOpen(false)}
+            onPointerDown={startResizeRightPanel}
+            title="Kéo trái / phải để chỉnh độ rộng khung bên phải"
+            className="w-1.5 -mx-1 cursor-col-resize touch-none flex items-center justify-center group shrink-0"
           >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                transform: sheetDragY > 0 ? `translate3d(0, ${sheetDragY}px, 0)` : undefined,
-                transition: sheetDragStartRef.current === null ? 'transform 0.3s var(--ease-ios-spring)' : 'none'
-              }}
-              className="ide-card overflow-hidden theme-scope ios-sheet-enter"
-            >
-              <div
-                onPointerDown={handleTerminalSheetDragStart}
-                onPointerMove={handleTerminalSheetDragMove}
-                onPointerUp={() => handleTerminalSheetDragEnd(() => setBottomOpen(false))}
-                onPointerCancel={() => handleTerminalSheetDragEnd(() => setBottomOpen(false))}
-                className="pt-2.5 pb-1.5 flex justify-center shrink-0 touch-none cursor-grab active:cursor-grabbing"
-                title="Vuốt xuống để đóng"
-              >
-                <span className="w-10 h-1 rounded-full opacity-40" style={{ backgroundColor: 'var(--text-secondary)' }} />
-              </div>
-              <BottomPanel
-                mode={mode}
-                logs={logs}
-                diagnostics={allDiagnostics}
-                isRunning={isRunning}
-                stdinPreset={stdinPreset}
-                autoEof={autoEof}
-                testCases={activeTestCases}
-                testResults={activeTestResults}
-                isRunningTests={isRunningTests}
-                onChangeTestCases={handleChangeActiveTestCases}
-                onRunAllTests={handleRunAllTests}
-                onRunSingleTest={handleRunSingleTest}
-                onChangeStdinPreset={setStdinPreset}
-                onChangeAutoEof={setAutoEof}
-                onRunWithInput={handleRun}
-                onSendStdin={handleSendStdin}
-                onSendEof={handleSendEof}
-                isWaitingForInput={isWaitingForInput}
-                hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
-                onKill={handleKill}
-                onClear={() => setLogs([])}
-                onJumpToDiagnostic={(d) => {
-                  setBottomOpen(false);
-                  const found = files.find((f) => f.uri === d.uri);
-                  if (found) openFileInActivePane(found);
-                  setTimeout(() => {
-                    activeEditorRef.current?.revealLineInCenter(d.line);
-                    activeEditorRef.current?.setPosition({ lineNumber: d.line, column: d.column });
-                  }, 40);
-                }}
-                onClose={() => setBottomOpen(false)}
-                requestedTab={requestedConsoleTab}
-                isSheet
-              />
-            </div>
+            <span className="w-0.5 h-12 rounded-full bg-transparent group-hover:bg-[var(--accent-primary)] transition-colors" />
           </div>
         )}
 
-        {/* RIGHT INSPECTOR ACTIVITY RAIL (XCODE / CURSOR / JETBRAINS STYLE — ZERO CODE OVERLAP) */}
         {!zenMode && (
-          <IpadFloatingDock
-            consoleDock={consoleDock}
-            bottomOpen={bottomOpen}
-            rightTool={ipadRightTool}
-            diffOpen={diffOpen}
-            trackpadOpen={trackpadOpen}
-            hardwareKeyboardMode={Boolean(editorSettings.hardwareKeyboardMode)}
-            compact={uiDensity === 'compact'}
-            onToggleConsoleDock={handleToggleConsoleDock}
-            onToggleRightTool={handleToggleRightTool}
-            onToggleDiff={() => setDiffOpen((v) => !v)}
-            onToggleTrackpad={() => setTrackpadOpen((v) => !v)}
-            onToggleHardwareKeyboardMode={handleToggleHardwareKeyboardMode}
-            onOpenShortcutsHud={() => {
-              setShortcutsHudHoldMode(false);
-              setShortcutsHudOpen(true);
+          <div
+            style={{
+              width: showRightPanel
+                ? `${Math.min(rightPanelWidth, Math.max(280, width - 320))}px`
+                : '0px',
+              marginLeft: showRightPanel ? '0px' : uiDensity === 'compact' ? '-6px' : '-10px',
+              transition: isResizingRightPanel
+                ? 'none'
+                : 'width 0.38s cubic-bezier(0.22, 1, 0.36, 1), margin-left 0.38s cubic-bezier(0.22, 1, 0.36, 1)'
             }}
-          />
+            className={`shrink-0 h-full flex justify-end overflow-hidden ${
+              showRightPanel ? '' : 'pointer-events-none'
+            }`}
+          >
+            <aside
+              style={{
+                width: `${Math.min(rightPanelWidth, Math.max(280, width - 320))}px`,
+                opacity: showRightPanel ? 1 : 0,
+                transform: showRightPanel
+                  ? 'translate3d(0, 0, 0) scale(1)'
+                  : 'translate3d(24px, 0, 0) scale(0.95)',
+                filter: showRightPanel ? 'blur(0px)' : 'blur(6px)',
+                transformOrigin: 'right center',
+                transition: isResizingRightPanel
+                  ? 'none'
+                  : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease, filter 0.3s ease',
+                willChange: 'transform, opacity, filter'
+              }}
+              className="shrink-0 h-full ide-card flex flex-col overflow-hidden"
+            >
+              <div
+                key={renderedRightKind}
+                className="flex-1 min-h-0 flex flex-col overflow-hidden right-panel-swap"
+              >
+                {renderedRightKind === 'scratchpad' ? (
+                  <PencilScratchpad
+                    projectKey={projectKey}
+                    onClose={() => setIpadRightTool(null)}
+                    onExportToast={(msg) => showToast(msg, 'success')}
+                  />
+                ) : renderedRightKind === 'notes' ? (
+                  <ProblemNotesPane
+                    projectKey={projectKey}
+                    onSendSampleToTests={handleSendSampleToTests}
+                    onClose={() => setIpadRightTool(null)}
+                  />
+                ) : (
+                  <BottomPanel
+                    mode={mode}
+                    logs={logs}
+                    diagnostics={allDiagnostics}
+                    isRunning={isRunning}
+                    lastElapsedMs={lastElapsedMs}
+                    stdinPreset={stdinPreset}
+                    autoEof={autoEof}
+                    testCases={activeTestCases}
+                    testResults={activeTestResults}
+                    isRunningTests={isRunningTests}
+                    onChangeTestCases={handleChangeActiveTestCases}
+                    onRunAllTests={handleRunAllTests}
+                    onRunSingleTest={handleRunSingleTest}
+                    onChangeStdinPreset={setStdinPreset}
+                    onChangeAutoEof={setAutoEof}
+                    onRunWithInput={handleRun}
+                    onSendStdin={handleSendStdin}
+                    onSendEof={handleSendEof}
+                    isWaitingForInput={isWaitingForInput}
+                    hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
+                    onKill={handleKill}
+                    onClear={() => {
+                      setLogs([]);
+                      setLastElapsedMs(null);
+                    }}
+                    onJumpToDiagnostic={(d) => {
+                      const found = files.find((f) => f.uri === d.uri);
+                      if (found) openFileInActivePane(found);
+                      setTimeout(() => {
+                        activeEditorRef.current?.revealLineInCenter(d.line);
+                        activeEditorRef.current?.setPosition({ lineNumber: d.line, column: d.column });
+                        activeEditorRef.current?.focus();
+                      }, 40);
+                    }}
+                    onClose={() => setBottomOpen(false)}
+                    dockPosition={consoleDock}
+                    onToggleDockPosition={handleToggleConsoleDock}
+                    requestedTab={requestedConsoleTab}
+                  />
+                )}
+              </div>
+            </aside>
+          </div>
         )}
       </div>
 
-      {/* QUIET SLEEK STATUS BAR */}
+      {/* QUIET FRAMELESS STATUS BAR */}
       {!zenMode && (
-        <div
-          className={`${
-            uiDensity === 'compact'
-              ? ''
-              : 'rounded-xl overflow-hidden border border-[var(--border-subtle)]'
-          } glass-surface shrink-0 relative z-10`}
-        >
+        <div className="shrink-0 relative z-10 rounded-xl overflow-hidden opacity-90">
           <StatusBar
             mode={mode}
             onToggleMode={() => handleSwitchMode(mode === 'local' ? 'standalone' : 'local')}
@@ -4227,6 +4179,187 @@ export default function App() {
               setShortcutsHudOpen(true);
             }}
           />
+        </div>
+      )}
+
+      {/* TABLET OVERLAY DRAWER — ĐẶT NGOÀI STACKING CONTEXT (z-50 + SAFE AREA CHỐNG ĐÈ HEADER/NOTCH) */}
+      {tabletDrawerMounted && breakpoint === 'tablet' && (
+        <div
+          style={{
+            opacity: tabletDrawerVisible ? 1 : 0,
+            transition: 'opacity 0.28s var(--ease-ios-out)',
+            paddingTop: 'max(12px, env(safe-area-inset-top))',
+            paddingRight: 'max(12px, env(safe-area-inset-right))',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            paddingLeft: 'max(12px, env(safe-area-inset-left))'
+          }}
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex"
+          onClick={() => setSidebarView(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              opacity: tabletDrawerVisible ? 1 : 0,
+              transform: tabletDrawerVisible
+                ? 'translate3d(0, 0, 0) scale(1)'
+                : 'translate3d(-104%, 0, 0) scale(0.95)',
+              filter: tabletDrawerVisible ? 'blur(0px)' : 'blur(4px)',
+              transition:
+                'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease, filter 0.3s ease',
+              willChange: 'transform, opacity, filter'
+            }}
+            className="h-full w-80 max-w-[85vw] ide-card flex flex-col overflow-hidden"
+          >
+            <div
+              key={renderedSidebarView}
+              className="flex-1 min-h-0 flex flex-col overflow-hidden sidebar-view-swap"
+            >
+              {renderedSidebarView !== 'explorer' && (
+                <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between shrink-0">
+                  <span
+                    style={{ color: 'var(--text-primary)' }}
+                    className="text-[15px] font-semibold tracking-tight"
+                  >
+                    {renderedSidebarView === 'search' ? 'Search' : 'Outline'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarView(null)}
+                    style={{ color: 'var(--text-secondary)' }}
+                    className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] flex items-center justify-center"
+                    title="Đóng"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              )}
+
+              <div
+                className={`flex-1 min-h-0 overflow-hidden theme-scope ${
+                  renderedSidebarView === 'explorer' ? 'explorer-clean' : ''
+                }`}
+              >
+                {renderedSidebarView === 'explorer' ? (
+                  <ExplorerSidebar
+                    tree={tree}
+                    files={files}
+                    activeFile={activeFile}
+                    onSelectFile={(f) => {
+                      openFileInActivePane(f);
+                      setSidebarView(null);
+                    }}
+                    onCreateFile={handleCreateFile}
+                    onCreateFolder={handleCreateFolder}
+                    onRenameEntry={handleRenameEntry}
+                    onImportCodeFiles={handleImportCodeFiles}
+                    onImportAssets={handleImportAssets}
+                    onExportBackup={handleExportBackup}
+                    onImportBackup={handleImportBackup}
+                    onDeleteEntry={handleDeleteEntry}
+                    onRefresh={() => loadWorkspaceForMode(mode)}
+                    onCloseMobile={() => setSidebarView(null)}
+                    isOverlay
+                  />
+                ) : renderedSidebarView === 'search' ? (
+                  <SearchSidebar
+                    files={files}
+                    onJump={(f, line, col) => {
+                      openFileInActivePane(f);
+                      setSidebarView(null);
+                      setTimeout(() => {
+                        activeEditorRef.current?.revealLineInCenter(line);
+                        activeEditorRef.current?.setPosition({ lineNumber: line, column: col });
+                        activeEditorRef.current?.focus();
+                      }, 40);
+                    }}
+                  />
+                ) : (
+                  <OutlinePanel
+                    file={activeFile}
+                    currentLine={cursor.line}
+                    onJumpToLine={(line) => {
+                      setSidebarView(null);
+                      setTimeout(() => {
+                        activeEditorRef.current?.revealLineInCenter(line);
+                        activeEditorRef.current?.setPosition({ lineNumber: line, column: 1 });
+                        activeEditorRef.current?.focus();
+                      }, 40);
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TABLET CONSOLE SHEET — ĐẶT NGOÀI STACKING CONTEXT (z-50 + SAFE AREA KHÔNG BỊ STATUS BAR & NOTCH CHE) */}
+      {bottomOpen && breakpoint === 'tablet' && !showRightConsoleDock && (
+        <div
+          style={{
+            paddingTop: 'max(12px, env(safe-area-inset-top))',
+            paddingRight: 'max(12px, env(safe-area-inset-right))',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            paddingLeft: 'max(12px, env(safe-area-inset-left))'
+          }}
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex flex-col justify-end ios-backdrop-enter"
+          onClick={() => setBottomOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              transform: sheetDragY > 0 ? `translate3d(0, ${sheetDragY}px, 0)` : undefined,
+              animation: sheetDragY > 0 || sheetDragStartRef.current !== null ? 'none' : undefined,
+              transition: sheetDragStartRef.current === null ? 'transform 0.3s var(--ease-ios-spring)' : 'none'
+            }}
+            className="w-full max-h-full ide-card overflow-hidden theme-scope ios-sheet-enter flex flex-col"
+          >
+            <div
+              onPointerDown={handleTerminalSheetDragStart}
+              onPointerMove={handleTerminalSheetDragMove}
+              onPointerUp={() => handleTerminalSheetDragEnd(() => setBottomOpen(false))}
+              onPointerCancel={() => handleTerminalSheetDragEnd(() => setBottomOpen(false))}
+              className="pt-2.5 pb-1.5 flex justify-center shrink-0 touch-none cursor-grab active:cursor-grabbing"
+              title="Vuốt xuống để đóng"
+            >
+              <span className="w-10 h-1 rounded-full opacity-40" style={{ backgroundColor: 'var(--text-secondary)' }} />
+            </div>
+            <BottomPanel
+              mode={mode}
+              logs={logs}
+              diagnostics={allDiagnostics}
+              isRunning={isRunning}
+              stdinPreset={stdinPreset}
+              autoEof={autoEof}
+              testCases={activeTestCases}
+              testResults={activeTestResults}
+              isRunningTests={isRunningTests}
+              onChangeTestCases={handleChangeActiveTestCases}
+              onRunAllTests={handleRunAllTests}
+              onRunSingleTest={handleRunSingleTest}
+              onChangeStdinPreset={setStdinPreset}
+              onChangeAutoEof={setAutoEof}
+              onRunWithInput={handleRun}
+              onSendStdin={handleSendStdin}
+              onSendEof={handleSendEof}
+              isWaitingForInput={isWaitingForInput}
+              hideVirtualKeyboard={Boolean(editorSettings.hardwareKeyboardMode)}
+              onKill={handleKill}
+              onClear={() => setLogs([])}
+              onJumpToDiagnostic={(d) => {
+                setBottomOpen(false);
+                const found = files.find((f) => f.uri === d.uri);
+                if (found) openFileInActivePane(found);
+                setTimeout(() => {
+                  activeEditorRef.current?.revealLineInCenter(d.line);
+                  activeEditorRef.current?.setPosition({ lineNumber: d.line, column: d.column });
+                }, 40);
+              }}
+              onClose={() => setBottomOpen(false)}
+              requestedTab={requestedConsoleTab}
+              isSheet
+            />
+          </div>
         </div>
       )}
 
@@ -4246,7 +4379,7 @@ export default function App() {
         files={liveFiles}
         activeFile={activeFile}
         snapshots={fileSnapshots}
-        monacoTheme={currentThemeObj.mode === 'light' ? 'code-ide-light' : 'code-ide-dark'}
+        monacoTheme={currentThemeObj.monacoTheme}
         fontSize={editorSettings.fontSize}
         onSaveSnapshot={handleSaveDiffSnapshot}
         onClose={() => setDiffOpen(false)}
@@ -4282,6 +4415,13 @@ export default function App() {
         onChangeUiDensity={setUiDensity}
         typingSound={typingSound}
         onChangeTypingSound={setTypingSound}
+        hapticsEnabled={hapticsEnabled}
+        onChangeHapticsEnabled={handleChangeHapticsEnabled}
+        onSyncDeviceFiles={handleSyncDeviceFiles}
+        isSyncingFiles={isSyncingFiles}
+        onPreloadOfflineCpp={handlePreloadOfflineCpp}
+        offlineCppState={offlineCppState}
+        offlineCppPercent={offlineCppPercent}
         visualPrefs={visualPrefs}
         onUpdateVisualPrefs={handleUpdateVisualPrefs}
       />

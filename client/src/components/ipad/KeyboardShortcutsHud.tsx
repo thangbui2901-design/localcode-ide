@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Command, X } from 'lucide-react';
 
 interface KeyboardShortcutsHudProps {
@@ -51,21 +51,52 @@ export const KeyboardShortcutsHud: React.FC<KeyboardShortcutsHudProps> = ({
   isHoldMode,
   onClose
 }) => {
-  if (!open) return null;
+  const [mounted, setMounted] = useState(open);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const raf = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setVisible(true));
+      });
+      return () => window.cancelAnimationFrame(raf);
+    }
+    setVisible(false);
+    const t = window.setTimeout(() => setMounted(false), 280);
+    return () => window.clearTimeout(t);
+  }, [open]);
+
+  if (!mounted) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/45 backdrop-blur-md flex items-center justify-center p-4 ios-backdrop-enter"
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.26s var(--ease-ios-out)'
+      }}
+      className={`fixed inset-0 z-50 bg-black/45 backdrop-blur-md flex items-center justify-center p-4 ${
+        visible ? '' : 'pointer-events-none'
+      }`}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: 'var(--bg-panel)',
+          backgroundColor: 'color-mix(in srgb, var(--bg-panel) 94%, transparent)',
           border: '1px solid var(--border-subtle)',
-          color: 'var(--text-primary)'
+          boxShadow: '0 24px 64px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+          color: 'var(--text-primary)',
+          opacity: visible ? 1 : 0,
+          transform: visible
+            ? 'translate3d(0, 0, 0) scale(1)'
+            : 'translate3d(0, 18px, 0) scale(0.92)',
+          filter: visible ? 'blur(0px)' : 'blur(8px)',
+          transition:
+            'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.28s ease',
+          willChange: 'transform, opacity, filter'
         }}
-        className="w-full max-w-4xl rounded-3xl p-5 sm:p-6 shadow-2xl ios-modal-enter"
+        className="w-full max-w-4xl rounded-3xl p-5 sm:p-6 backdrop-blur-2xl"
       >
         <div className="flex items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-2.5">

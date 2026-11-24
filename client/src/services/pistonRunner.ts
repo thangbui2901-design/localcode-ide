@@ -154,6 +154,7 @@ static int __lc_str_ends_with(const char *s, const char *suf) {
 
 ${mountedDecls}
 
+__attribute__((unused))
 static void __lc_mount_file(const char *name, const unsigned char *data, size_t len) {
   FILE *fp = fopen(name, "wb");
   if (fp) {
@@ -161,8 +162,7 @@ static void __lc_mount_file(const char *name, const unsigned char *data, size_t 
     fclose(fp);
   }
   if (__lc_mnt_count < 16) {
-    strncpy(__lc_mnt_names[__lc_mnt_count], name, 255);
-    __lc_mnt_names[__lc_mnt_count][255] = '\\0';
+    snprintf(__lc_mnt_names[__lc_mnt_count], 256, "%s", name);
     __lc_mnt_lens[__lc_mnt_count] = len;
     __lc_mnt_hashes[__lc_mnt_count] = __lc_fnv1a(data, len);
     __lc_mnt_count++;
@@ -280,8 +280,7 @@ static void __lc_sync_files_back(void) {
     struct dirent *pe;
     while ((pe = readdir(pd)) != NULL && __lc_pre_count < 64) {
       if (pe->d_name[0] == '.') continue;
-      strncpy(__lc_pre_names[__lc_pre_count], pe->d_name, 255);
-      __lc_pre_names[__lc_pre_count][255] = '\\0';
+      snprintf(__lc_pre_names[__lc_pre_count], 256, "%s", pe->d_name);
       __lc_pre_count++;
     }
     closedir(pd);
@@ -320,7 +319,10 @@ ${mountedInit}
 `
     : '';
 
-  const shim = `#ifndef _GNU_SOURCE
+  const shim = `#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wextra"
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #include <stdio.h>
@@ -339,6 +341,7 @@ static void __lc_init_runtime(void) {
 ${initFsBody}
 ${initStdinBody}
 }
+#pragma GCC diagnostic pop
 #line 1
 `;
 
@@ -399,17 +402,36 @@ interface WandboxExtraFile {
 
 const WANDBOX_COMPILE_URL = 'https://wandbox.org/api/compile.json';
 const ANSI_REGEX = new RegExp('\\x1b\\[[0-9;]*[a-zA-Z]', 'g');
+const CLANG_PRELOADED_KEY = 'codeide_clang_wasm_preloaded';
 
 let persistentPythonWorker: Worker | null = null;
 let activePythonKill: (() => void) | null = null;
+let persistentClangWorker: Worker | null = null;
+let activeClangKill: (() => void) | null = null;
 let activeCppAbort: AbortController | null = null;
 
 function stripAnsi(text: string): string {
   return text.replace(ANSI_REGEX, '');
 }
 
+export function isOfflineCppPreloaded(): boolean {
+  try {
+    return localStorage.getItem(CLANG_PRELOADED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markOfflineCppPreloaded(): void {
+  try {
+    localStorage.setItem(CLANG_PRELOADED_KEY, '1');
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * Dừng khẩn cấp tiến trình Python Worker (vòng lặp vô hạn) hoặc hủy request C/C++
+ * Dừng khẩn cấp tiến trình Python/Clang Worker (vòng lặp vô hạn) hoặc hủy request C/C++ Cloud
  */
 export function terminateCloudExecution(): void {
   if (activePythonKill) {
@@ -422,10 +444,163 @@ export function terminateCloudExecution(): void {
     killFn();
   }
 
+  if (activeClangKill) {
+    if (persistentClangWorker) {
+      persistentClangWorker.terminate();
+      persistentClangWorker = null;
+    }
+    const killFn = activeClangKill;
+    activeClangKill = null;
+    killFn();
+  }
+
   if (activeCppAbort) {
     activeCppAbort.abort();
     activeCppAbort = null;
   }
+}
+
+function getOrCreateClangWorker(): Worker {
+  if (!persistentClangWorker) {
+    persistentClangWorker = new Worker(
+      new URL('../workers/clangWasmWorker.ts', import.meta.url),
+      { type: 'module' }
+    );
+  }
+  return persistentClangWorker;
+}
+
+export function preloadOfflineCppCompiler(
+  onProgress?: (percent: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const worker = getOrCreateClangWorker();
+    const cleanup = () => {
+      worker.onmessage = null;
+      worker.onerror = null;
+    };
+
+    worker.onmessage = (event: MessageEvent) => {
+      const msg = event.data;
+      if (!msg) return;
+      if (msg.type === 'preload-progress' && typeof msg.percent === 'number') {
+        onProgress?.(msg.percent);
+      } else if (msg.type === 'preload-done') {
+        cleanup();
+        if (msg.ok) {
+          markOfflineCppPreloaded();
+          onProgress?.(100);
+          resolve();
+        } else {
+          reject(new Error(msg.error || 'Không thể tải trình biên dịch Clang WASM'));
+        }
+      }
+    };
+
+    worker.onerror = (err) => {
+      cleanup();
+      persistentClangWorker?.terminate();
+      persistentClangWorker = null;
+      reject(new Error(err.message || 'Lỗi khởi tạo Clang WASM Worker'));
+    };
+
+    worker.postMessage({ type: 'preload' });
+  });
+}
+
+function runCppInClangWasmWorker(
+  activeFile: WorkspaceFile,
+  latestFiles: WorkspaceFile[],
+  compilerSettings: CompilerSettings,
+  stdin: string,
+  interactive: boolean,
+  syncFiles: boolean,
+  dataFiles: SyncedWorkspaceFile[],
+  suppressWarnings: boolean,
+  callbacks: PistonLogCallback
+): Promise<{
+  exitCode: number;
+  elapsedMs: number;
+  waitingForInput?: boolean;
+  syncedFiles?: SyncedWorkspaceFile[];
+}> {
+  return new Promise((resolve) => {
+    const startTime = performance.now();
+    const isC = activeFile.language === 'c';
+    const stdFlag = resolveStdFlag(isC, compilerSettings);
+    const { entryCode, entryFileName, extraFiles, extraSourceNames } = prepareCppProjectFiles(
+      activeFile,
+      latestFiles,
+      isC
+    );
+    const worker = getOrCreateClangWorker();
+
+    const cleanup = () => {
+      worker.onmessage = null;
+      worker.onerror = null;
+      activeClangKill = null;
+    };
+
+    activeClangKill = () => {
+      cleanup();
+      callbacks.onChunk('stderr', '\n[Tiến trình Offline C/C++ đã bị dừng bởi người dùng (SIGKILL)]\n');
+      resolve({
+        exitCode: 137,
+        elapsedMs: Math.round(performance.now() - startTime),
+        waitingForInput: false,
+        syncedFiles: []
+      });
+    };
+
+    worker.onmessage = (event: MessageEvent) => {
+      const msg = event.data;
+      if (!msg) return;
+
+      if (msg.type === 'done') {
+        cleanup();
+        markOfflineCppPreloaded();
+        resolve({
+          exitCode: Number(msg.exitCode) || 0,
+          elapsedMs: Number(msg.elapsedMs) || Math.round(performance.now() - startTime),
+          waitingForInput: Boolean(msg.waitingForInput),
+          syncedFiles: Array.isArray(msg.syncedFiles) ? msg.syncedFiles : []
+        });
+        return;
+      }
+
+      if (msg.type === 'status' || msg.type === 'stdout' || msg.type === 'stderr') {
+        callbacks.onChunk(msg.type, String(msg.text ?? ''));
+      }
+    };
+
+    worker.onerror = (err) => {
+      cleanup();
+      persistentClangWorker?.terminate();
+      persistentClangWorker = null;
+      callbacks.onChunk('stderr', `Lỗi Offline Clang Worker: ${err.message || 'Không xác định'}\n`);
+      resolve({
+        exitCode: 1,
+        elapsedMs: Math.round(performance.now() - startTime),
+        waitingForInput: false,
+        syncedFiles: []
+      });
+    };
+
+    worker.postMessage({
+      type: 'run',
+      code: entryCode,
+      isC,
+      fileName: entryFileName,
+      stdFlag,
+      stdin,
+      interactive,
+      syncFiles,
+      suppressWarnings,
+      extraFiles,
+      extraSourceNames,
+      workspaceFiles: dataFiles
+    });
+  });
 }
 
 function getOrCreatePythonWorker(): Worker {
@@ -526,7 +701,12 @@ function prepareCppProjectFiles(
   activeFile: WorkspaceFile,
   latestFiles: WorkspaceFile[],
   isC: boolean
-): { entryCode: string; extraFiles: WandboxExtraFile[]; extraSourceNames: string[] } {
+): {
+  entryCode: string;
+  entryFileName: string;
+  extraFiles: WandboxExtraFile[];
+  extraSourceNames: string[];
+} {
   const getDir = (filePath: string) =>
     filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : '';
 
@@ -539,7 +719,12 @@ function prepareCppProjectFiles(
   );
 
   if (siblingFiles.length <= 1) {
-    return { entryCode: activeFile.content, extraFiles: [], extraSourceNames: [] };
+    return {
+      entryCode: activeFile.content,
+      entryFileName: activeFile.name,
+      extraFiles: [],
+      extraSourceNames: []
+    };
   }
 
   const hasMain = (content: string) => /\bint\s+main\s*\(/.test(content);
@@ -558,7 +743,12 @@ function prepareCppProjectFiles(
     }
   }
 
-  return { entryCode: entryFile.content, extraFiles, extraSourceNames };
+  return {
+    entryCode: entryFile.content,
+    entryFileName: entryFile.name,
+    extraFiles,
+    extraSourceNames
+  };
 }
 
 async function runWithGodbolt(
@@ -569,6 +759,7 @@ async function runWithGodbolt(
   interactive: boolean,
   syncFiles: boolean,
   dataFiles: SyncedWorkspaceFile[],
+  suppressWarnings: boolean,
   signal: AbortSignal,
   callbacks: PistonLogCallback
 ): Promise<{
@@ -657,7 +848,7 @@ async function runWithGodbolt(
   if (stdout) {
     callbacks.onChunk('stdout', waitingForInput ? stdout : `${stdout}\n`);
   }
-  const allErr = [buildStderr, stderr.trim()].filter(Boolean).join('\n');
+  const allErr = [suppressWarnings ? '' : buildStderr, stderr.trim()].filter(Boolean).join('\n');
   if (allErr) callbacks.onChunk('stderr', `${allErr}\n`);
 
   return { exitCode, elapsedMs, waitingForInput, syncedFiles };
@@ -671,6 +862,7 @@ async function runWithWandboxFallback(
   interactive: boolean,
   syncFiles: boolean,
   dataFiles: SyncedWorkspaceFile[],
+  suppressWarnings: boolean,
   signal: AbortSignal,
   callbacks: PistonLogCallback
 ): Promise<{
@@ -736,7 +928,9 @@ async function runWithWandboxFallback(
   }
 
   if (programOutput) callbacks.onChunk('stdout', programOutput);
-  const combinedStderr = [compileError.trim(), programError.trim()].filter(Boolean).join('\n');
+  const combinedStderr = [suppressWarnings ? '' : compileError.trim(), programError.trim()]
+    .filter(Boolean)
+    .join('\n');
   if (combinedStderr) callbacks.onChunk('stderr', `${combinedStderr}\n`);
 
   return { exitCode, elapsedMs, waitingForInput, syncedFiles };
@@ -756,12 +950,22 @@ export async function executeWithPiston(
   const syncFiles = Boolean(options?.syncFiles);
   const dataFiles = syncFiles ? collectWorkspaceDataFiles(activeFile, latestFiles) : [];
 
+  const cppEngine = compilerSettings.cppEngine || 'auto';
+  const isOfflineNow = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const useOfflineCppDirect =
+    (lang === 'cpp' || lang === 'c') &&
+    (cppEngine === 'offline-wasm' || (cppEngine === 'auto' && isOfflineNow));
+
   const cmdLabel =
     lang === 'python'
-      ? `[Pyodide Worker] python3 ${activeFile.name}`
-      : lang === 'c'
-        ? `[GCC 14.2] gcc ${activeFile.name} -o main && ./main`
-        : `[G++ 14.2] g++ ${activeFile.name} -o main && ./main`;
+      ? `[Pyodide WASM] python3 ${activeFile.name}`
+      : useOfflineCppDirect
+        ? lang === 'c'
+          ? `[Offline Clang WASM] clang ${activeFile.name} -o main.wasm`
+          : `[Offline Clang++ WASM] clang++ ${activeFile.name} -o main.wasm`
+        : lang === 'c'
+          ? `[GCC 14.2] gcc ${activeFile.name} -o main && ./main`
+          : `[G++ 14.2] g++ ${activeFile.name} -o main && ./main`;
 
   if (!options?.suppressHeader) {
     callbacks.onChunk('status', `> ${cmdLabel}\n`);
@@ -785,11 +989,10 @@ export async function executeWithPiston(
         callbacks
       );
     } else if (lang === 'cpp' || lang === 'c') {
-      const abortController = new AbortController();
-      activeCppAbort = abortController;
+      const suppressWarnings = Boolean(options?.suppressHeader);
 
-      try {
-        result = await runWithGodbolt(
+      if (useOfflineCppDirect) {
+        result = await runCppInClangWasmWorker(
           activeFile,
           latestFiles,
           compilerSettings,
@@ -797,15 +1000,15 @@ export async function executeWithPiston(
           interactive,
           syncFiles,
           dataFiles,
-          abortController.signal,
+          suppressWarnings,
           callbacks
         );
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
-          callbacks.onChunk('stderr', '\n[Đã hủy yêu cầu biên dịch C/C++]\n');
-          result = { exitCode: 130, elapsedMs: Math.round(performance.now() - startAll) };
-        } else {
-          result = await runWithWandboxFallback(
+      } else {
+        const abortController = new AbortController();
+        activeCppAbort = abortController;
+
+        try {
+          result = await runWithGodbolt(
             activeFile,
             latestFiles,
             compilerSettings,
@@ -813,12 +1016,57 @@ export async function executeWithPiston(
             interactive,
             syncFiles,
             dataFiles,
+            suppressWarnings,
             abortController.signal,
             callbacks
           );
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            callbacks.onChunk('stderr', '\n[Đã hủy yêu cầu biên dịch C/C++]\n');
+            result = { exitCode: 130, elapsedMs: Math.round(performance.now() - startAll) };
+          } else {
+            try {
+              result = await runWithWandboxFallback(
+                activeFile,
+                latestFiles,
+                compilerSettings,
+                stdinPreset || '',
+                interactive,
+                syncFiles,
+                dataFiles,
+                suppressWarnings,
+                abortController.signal,
+                callbacks
+              );
+            } catch (wandboxErr: any) {
+              if (wandboxErr?.name === 'AbortError') {
+                callbacks.onChunk('stderr', '\n[Đã hủy yêu cầu biên dịch C/C++]\n');
+                result = { exitCode: 130, elapsedMs: Math.round(performance.now() - startAll) };
+              } else if (cppEngine === 'auto') {
+                callbacks.onChunk(
+                  'status',
+                  '> Không kết nối được Cloud Compiler — Tự chuyển sang Offline LLVM Clang WASM...\n'
+                );
+                activeCppAbort = null;
+                result = await runCppInClangWasmWorker(
+                  activeFile,
+                  latestFiles,
+                  compilerSettings,
+                  stdinPreset || '',
+                  interactive,
+                  syncFiles,
+                  dataFiles,
+                  suppressWarnings,
+                  callbacks
+                );
+              } else {
+                throw wandboxErr;
+              }
+            }
+          }
+        } finally {
+          activeCppAbort = null;
         }
-      } finally {
-        activeCppAbort = null;
       }
     } else {
       throw new Error(`Ngôn ngữ "${lang}" chưa được hỗ trợ thực thi.`);

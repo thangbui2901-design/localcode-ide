@@ -57,6 +57,21 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
   const [leftSource, setLeftSource] = useState<string>('__snapshot__');
   const [rightPath, setRightPath] = useState<string>('');
   const [sideBySide, setSideBySide] = useState<boolean>(true);
+  const [mounted, setMounted] = useState(open);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const raf = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setVisible(true));
+      });
+      return () => window.cancelAnimationFrame(raf);
+    }
+    setVisible(false);
+    const t = window.setTimeout(() => setMounted(false), 280);
+    return () => window.clearTimeout(t);
+  }, [open]);
 
   const hostRef = useRef<HTMLDivElement | null>(null);
   const diffEditorRef = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
@@ -100,18 +115,29 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
   const lang = mapLang(rightFile?.language);
 
   useEffect(() => {
-    if (!open || !hostRef.current) return;
+    if (!mounted || !hostRef.current) return;
 
     const diffEditor = monaco.editor.createDiffEditor(hostRef.current, {
       theme: monacoTheme,
       automaticLayout: true,
       readOnly: true,
       renderSideBySide: sideBySide,
+      renderOverviewRuler: false,
+      overviewRulerBorder: false,
+      hideCursorInOverviewRuler: true,
       fontSize,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       wordWrap: 'on',
       smoothScrolling: true,
+      scrollbar: {
+        verticalScrollbarSize: 8,
+        horizontalScrollbarSize: 8,
+        verticalSliderSize: 5,
+        horizontalSliderSize: 5,
+        useShadows: false,
+        alwaysConsumeMouseWheel: false
+      },
       padding: { top: 12, bottom: 12 }
     });
     diffEditorRef.current = diffEditor;
@@ -129,12 +155,12 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
       diffEditorRef.current = null;
       modelsRef.current = { original: null, modified: null };
     };
-  }, [open]);
+  }, [mounted]);
 
   // Update models & options live without remounting
   useEffect(() => {
     const diffEditor = diffEditorRef.current;
-    if (!diffEditor || !open) return;
+    if (!diffEditor || !mounted) return;
 
     diffEditor.updateOptions({
       renderSideBySide: sideBySide,
@@ -152,13 +178,23 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
 
     prevOrig?.dispose();
     prevMod?.dispose();
-  }, [leftContent, rightContent, lang, sideBySide, monacoTheme, fontSize, open]);
+  }, [leftContent, rightContent, lang, sideBySide, monacoTheme, fontSize, mounted]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 ios-backdrop-enter"
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.26s var(--ease-ios-out)',
+        paddingTop: 'max(12px, env(safe-area-inset-top))',
+        paddingRight: 'max(12px, env(safe-area-inset-right))',
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(12px, env(safe-area-inset-left))'
+      }}
+      className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center ${
+        visible ? '' : 'pointer-events-none'
+      }`}
       onClick={onClose}
     >
       <div
@@ -166,9 +202,18 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
         style={{
           backgroundColor: 'var(--bg-panel)',
           border: '1px solid var(--border-subtle)',
-          color: 'var(--text-primary)'
+          boxShadow: '0 24px 64px -12px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+          color: 'var(--text-primary)',
+          opacity: visible ? 1 : 0,
+          transform: visible
+            ? 'translate3d(0, 0, 0) scale(1)'
+            : 'translate3d(0, 20px, 0) scale(0.93)',
+          filter: visible ? 'blur(0px)' : 'blur(8px)',
+          transition:
+            'transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, filter 0.28s ease',
+          willChange: 'transform, opacity, filter'
         }}
-        className="w-full max-w-6xl h-[86vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col ios-modal-enter"
+        className="w-full max-w-6xl h-[86vh] rounded-3xl overflow-hidden flex flex-col"
       >
         {/* Header */}
         <div

@@ -1,4 +1,10 @@
 import { FileNode, SupportedLanguage, WorkspaceFile } from '../types/ide';
+import {
+  deleteFromIosDocuments,
+  mirrorFileToIosDocuments,
+  mirrorFolderToIosDocuments,
+  renameInIosDocuments
+} from '../utils/iosNative';
 
 const DB_NAME = 'LocalCodeIDE_Workspace_DB';
 const DB_VERSION = 1;
@@ -271,7 +277,11 @@ export async function loadIdbWorkspace(): Promise<{ tree: FileNode[]; files: Wor
   return { tree: rootNodes, files: flatFiles };
 }
 
-export async function saveIdbFile(relPath: string, content: string): Promise<string> {
+export async function saveIdbFile(
+  relPath: string,
+  content: string,
+  skipIosMirror = false
+): Promise<string> {
   const db = await openDatabase();
   const cleanPath = relPath.replace(/^\/+/, '');
   const name = cleanPath.split('/').pop() || cleanPath;
@@ -297,10 +307,14 @@ export async function saveIdbFile(relPath: string, content: string): Promise<str
     tx.onerror = () => reject(tx.error);
   });
 
+  if (!skipIosMirror) {
+    void mirrorFileToIosDocuments(cleanPath, content);
+  }
+
   return `file:///workspace/${cleanPath}`;
 }
 
-export async function createIdbFolder(relPath: string): Promise<void> {
+export async function createIdbFolder(relPath: string, skipIosMirror = false): Promise<void> {
   const db = await openDatabase();
   const cleanPath = relPath.replace(/^\/+/, '');
   const tx = db.transaction(STORE_FOLDERS, 'readwrite');
@@ -315,6 +329,10 @@ export async function createIdbFolder(relPath: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+
+  if (!skipIosMirror) {
+    void mirrorFolderToIosDocuments(cleanPath);
+  }
 }
 
 export async function deleteIdbEntry(relPath: string): Promise<void> {
@@ -341,6 +359,8 @@ export async function deleteIdbEntry(relPath: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+
+  void deleteFromIosDocuments(relPath);
 }
 
 export async function renameIdbEntry(oldPath: string, newPath: string): Promise<void> {
@@ -388,6 +408,8 @@ export async function renameIdbEntry(oldPath: string, newPath: string): Promise<
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+
+  void renameInIosDocuments(cleanOld, cleanNew);
 }
 
 export async function exportIdbWorkspaceJson(): Promise<string> {

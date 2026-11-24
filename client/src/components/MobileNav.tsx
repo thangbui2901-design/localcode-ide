@@ -53,67 +53,70 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   };
 
   return (
-    <nav
-      style={{
-        backgroundColor: 'var(--bg-panel)',
-        borderTop: '1px solid var(--border-subtle)'
-      }}
-      className="w-full shrink-0 select-none backdrop-blur-xl"
-    >
-      <div className="relative max-w-lg mx-auto flex items-center">
-        {/* Thanh gạch chân trượt mượt kiểu cổ điển chuẩn iOS */}
-        <div
-          aria-hidden="true"
-          style={{
-            width: `${100 / tabs.length}%`,
-            transform: `translate3d(${activeIndex * 100}%, 0, 0)`,
-            transition: 'transform 0.36s var(--ease-ios-spring)'
-          }}
-          className="absolute bottom-0 left-0 flex justify-center pointer-events-none"
-        >
-          <span
+    <nav className="w-full shrink-0 select-none px-3.5 pt-1.5 pb-2.5 z-20 pointer-events-none">
+      <div
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--bg-panel) 86%, transparent)',
+          border: '1px solid var(--border-subtle)',
+          boxShadow:
+            '0 14px 36px -10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+        }}
+        className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-2xl"
+      >
+        <div className="relative flex items-center">
+          {/* Viên thuốc trượt bo tròn mượt bên trong giống thanh bar iOS/Messenger */}
+          <div
+            aria-hidden="true"
             style={{
-              backgroundColor: 'var(--accent-primary)',
-              boxShadow: '0 0 10px var(--accent-glow)'
+              width: `${100 / tabs.length}%`,
+              transform: `translate3d(${activeIndex * 100}%, 0, 0)`,
+              transition: 'transform 0.38s var(--ease-ios-spring)'
             }}
-            className="w-11 h-[2.5px] rounded-full"
-          />
-        </div>
-
-        {tabs.map((tab) => {
-          const active = tab.id === activeTab;
-          const badge = tab.id === 'terminal' ? problemCount : 0;
-
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                if (tab.id === 'home') {
-                  onGoHome?.();
-                } else {
-                  onSelectTab(tab.id);
-                }
-              }}
+            className="absolute inset-y-0 left-0 pointer-events-none"
+          >
+            <div
               style={{
-                color: active ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                backgroundColor: 'color-mix(in srgb, var(--text-primary) 11%, transparent)'
               }}
-              className="relative flex-1 h-[54px] flex flex-col items-center justify-center gap-1 transition-colors duration-200 active:scale-95"
-            >
-              <span className={active ? 'ios-nav-icon-active' : ''}>
-                {renderIcon(tab.id, active)}
-              </span>
-              <span className={`text-[10px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
-                {tab.label}
-              </span>
-              {badge > 0 && (
-                <span className="absolute top-1.5 right-4 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
-                  {badge}
+              className="w-full h-full rounded-full"
+            />
+          </div>
+
+          {tabs.map((tab) => {
+            const active = tab.id === activeTab;
+            const badge = tab.id === 'terminal' ? problemCount : 0;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  if (tab.id === 'home') {
+                    onGoHome?.();
+                  } else {
+                    onSelectTab(tab.id);
+                  }
+                }}
+                style={{
+                  color: active ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                }}
+                className="relative z-10 flex-1 h-12 rounded-full flex flex-col items-center justify-center gap-0.5 transition-colors duration-200 active:scale-95"
+              >
+                <span className={`relative ${active ? 'ios-nav-icon-active' : ''}`}>
+                  {renderIcon(tab.id, active)}
+                  {badge > 0 && (
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
+                      {badge}
+                    </span>
+                  )}
                 </span>
-              )}
-            </button>
-          );
-        })}
+                <span className={`text-[10px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

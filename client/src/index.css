@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* =====================================================================
-   6 BỘ GIAO DIỆN (4 DARK THEMES + 2 LIGHT THEMES) - KHÔNG VIỀN (BORDERLESS)
+   12 BỘ GIAO DIỆN (8 DARK THEMES + 4 LIGHT THEMES) - KHÔNG VIỀN (BORDERLESS)
    ===================================================================== */
 
 :root,
@@ -22,6 +22,57 @@
   --accent-glow: rgba(59, 130, 246, 0.36);
   --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.65);
   --editor-bg: #0d1326;
+}
+
+[data-ui-theme='tokyo-night'] {
+  --bg-canvas: #13141e;
+  --bg-panel: #1a1b26;
+  --bg-panel-alt: #1f2335;
+  --bg-elevated: #24283b;
+  --bg-hover: #2f3549;
+  --bg-active: rgba(122, 162, 247, 0.2);
+  --border-subtle: rgba(122, 162, 247, 0.14);
+  --text-primary: #c0caf5;
+  --text-secondary: #7982a9;
+  --accent-primary: #7aa2f7;
+  --accent-secondary: #7dcfff;
+  --accent-glow: rgba(122, 162, 247, 0.36);
+  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.72);
+  --editor-bg: #1a1b26;
+}
+
+[data-ui-theme='catppuccin-mocha'] {
+  --bg-canvas: #161622;
+  --bg-panel: #1e1e2e;
+  --bg-panel-alt: #242437;
+  --bg-elevated: #313244;
+  --bg-hover: #3b3d54;
+  --bg-active: rgba(203, 166, 247, 0.2);
+  --border-subtle: rgba(203, 166, 247, 0.13);
+  --text-primary: #cdd6f4;
+  --text-secondary: #9399b2;
+  --accent-primary: #cba6f7;
+  --accent-secondary: #f5c2e7;
+  --accent-glow: rgba(203, 166, 247, 0.36);
+  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.68);
+  --editor-bg: #1e1e2e;
+}
+
+[data-ui-theme='nord-frost'] {
+  --bg-canvas: #232832;
+  --bg-panel: #2e3440;
+  --bg-panel-alt: #353c4a;
+  --bg-elevated: #3b4252;
+  --bg-hover: #434c5e;
+  --bg-active: rgba(136, 192, 208, 0.2);
+  --border-subtle: rgba(216, 222, 233, 0.11);
+  --text-primary: #eceff4;
+  --text-secondary: #a5b1c2;
+  --accent-primary: #88c0d0;
+  --accent-secondary: #81a1c1;
+  --accent-glow: rgba(136, 192, 208, 0.34);
+  --shadow-card: 0 10px 28px -14px rgba(10, 14, 22, 0.62);
+  --editor-bg: #2e3440;
 }
 
 [data-ui-theme='cyber-emerald'] {
@@ -75,6 +126,23 @@
   --editor-bg: #1e1e1e;
 }
 
+[data-ui-theme='oled-obsidian'] {
+  --bg-canvas: #000000;
+  --bg-panel: #07080c;
+  --bg-panel-alt: #0d0f15;
+  --bg-elevated: #151822;
+  --bg-hover: #1e2230;
+  --bg-active: rgba(56, 189, 248, 0.18);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --text-primary: #f4f4f5;
+  --text-secondary: #8a8f9e;
+  --accent-primary: #38bdf8;
+  --accent-secondary: #818cf8;
+  --accent-glow: rgba(56, 189, 248, 0.36);
+  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.9);
+  --editor-bg: #06070a;
+}
+
 [data-ui-theme='lavender-light'] {
   --bg-canvas: #eef1f8;
   --bg-panel: #ffffff;
@@ -90,6 +158,40 @@
   --accent-glow: rgba(37, 99, 235, 0.24);
   --shadow-card: 0 10px 28px -14px rgba(15, 23, 42, 0.12);
   --editor-bg: #ffffff;
+}
+
+[data-ui-theme='github-light'] {
+  --bg-canvas: #f3f5f8;
+  --bg-panel: #ffffff;
+  --bg-panel-alt: #f6f8fa;
+  --bg-elevated: #eaeef2;
+  --bg-hover: #dde3ea;
+  --bg-active: rgba(9, 105, 218, 0.13);
+  --border-subtle: rgba(31, 35, 40, 0.11);
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --accent-primary: #0969da;
+  --accent-secondary: #218bff;
+  --accent-glow: rgba(9, 105, 218, 0.24);
+  --shadow-card: 0 10px 26px -14px rgba(31, 35, 40, 0.12);
+  --editor-bg: #ffffff;
+}
+
+[data-ui-theme='rose-pine-dawn'] {
+  --bg-canvas: #f2e9e1;
+  --bg-panel: #faf4ed;
+  --bg-panel-alt: #f4ede8;
+  --bg-elevated: #ebe2da;
+  --bg-hover: #dfd4cb;
+  --bg-active: rgba(215, 130, 126, 0.18);
+  --border-subtle: rgba(87, 82, 121, 0.12);
+  --text-primary: #575279;
+  --text-secondary: #797593;
+  --accent-primary: #d7827e;
+  --accent-secondary: #907aa9;
+  --accent-glow: rgba(215, 130, 126, 0.28);
+  --shadow-card: 0 10px 26px -14px rgba(87, 82, 121, 0.14);
+  --editor-bg: #faf4ed;
 }
 
 [data-ui-theme='solarized-light'] {
@@ -124,6 +226,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  background-color: var(--bg-canvas);
+  height: 100%;
+}
+
 html,
 body {
   touch-action: manipulation;
@@ -135,6 +242,7 @@ body {
 body {
   background-color: var(--bg-canvas);
   color: var(--text-primary);
+  height: 100%;
   transition: background-color 0.28s var(--ease-ios-out), color 0.28s var(--ease-ios-out);
   font-family: var(--font-apple-ui);
   letter-spacing: -0.008em;
@@ -165,8 +273,8 @@ pre {
 .ide-card {
   background-color: var(--bg-panel);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  box-shadow: var(--shadow-card);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition:
     background-color 0.28s var(--ease-ios-out),
     border-color 0.28s var(--ease-ios-out),
@@ -175,7 +283,7 @@ pre {
 }
 
 [data-ui-density='compact'] .ide-card {
-  border-radius: 0px;
+  border-radius: 12px;
   box-shadow: none;
 }
 
@@ -844,6 +952,8 @@ pre {
 }
 
 [data-ui-theme='lavender-light'] .spotlight-card::after,
+[data-ui-theme='github-light'] .spotlight-card::after,
+[data-ui-theme='rose-pine-dawn'] .spotlight-card::after,
 [data-ui-theme='solarized-light'] .spotlight-card::after {
   background: radial-gradient(
     240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
@@ -1110,18 +1220,78 @@ pre {
   transform: scale(0.95);
 }
 
+/* =====================================================================
+   THANH CUỘN LIQUID-GLASS FLOATING PILL (TOÀN APP + MONACO EDITOR & DIFF)
+   ===================================================================== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 30%, transparent) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 ::-webkit-scrollbar-thumb {
-  background: var(--accent-glow);
+  background-color: color-mix(in srgb, var(--text-secondary) 28%, transparent);
   border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.22s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 55%, var(--text-secondary));
+  border: 1.5px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--accent-primary);
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+
+/* Monaco Editor & Diff Viewer: Floating Pill Scrollbars & Bỏ dải xám thô bên phải */
+.monaco-editor .scrollbar,
+.monaco-editor .scrollbar.vertical,
+.monaco-editor .scrollbar.horizontal {
+  background: transparent !important;
+}
+
+.monaco-editor .scrollbar .slider {
+  border-radius: 9999px !important;
+  background-color: color-mix(in srgb, var(--text-secondary) 30%, transparent) !important;
+  transition: background-color 0.2s ease, opacity 0.22s ease !important;
+}
+
+.monaco-editor .scrollbar .slider:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 58%, var(--text-secondary)) !important;
+}
+
+.monaco-editor .scrollbar .slider.active {
+  background-color: var(--accent-primary) !important;
+}
+
+.monaco-editor .scroll-decoration {
+  box-shadow: none !important;
+}
+
+.monaco-editor .decorationsOverviewRuler,
+.monaco-diff-editor .diffOverview {
+  background: transparent !important;
+  border: none !important;
+  opacity: 0.72;
 }
 
 /* iPadOS Pointer Magnetism Hover for Floating Dock */
@@ -1141,4 +1311,58 @@ pre {
 
 .ipad-dock-item:active {
   transform: scale(0.92);
+}
+
+/* Ẩn nút bàn phím nổi mặc định của Monaco trên iOS/iPadOS & bỏ viền focus xanh thô của WebKit */
+.monaco-editor .iPadShowKeyboard {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.monaco-editor,
+.monaco-editor:focus,
+.monaco-editor:focus-visible,
+.monaco-editor .overflow-guard,
+.monaco-editor .overflow-guard:focus,
+.monaco-editor .monaco-scrollable-element,
+.monaco-editor .inputarea {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-focus-ring-color: transparent !important;
+}
+
+/* Chuyển đổi mượt giữa Explorer / Search / Outline trong Sidebar */
+@keyframes sidebarViewSwap {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0) scale(0.985);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.sidebar-view-swap {
+  animation: sidebarViewSwap 0.28s var(--ease-ios-spring) both;
+}
+
+@keyframes rightPanelSwap {
+  from {
+    opacity: 0;
+    transform: translate3d(10px, 0, 0) scale(0.985);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.right-panel-swap {
+  animation: rightPanelSwap 0.28s var(--ease-ios-spring) both;
 }

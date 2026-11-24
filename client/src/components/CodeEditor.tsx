@@ -263,6 +263,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       fixedOverflowWidgets: true,
       scrollBeyondLastLine: false,
       smoothScrolling: true,
+      overviewRulerBorder: false,
+      overviewRulerLanes: 0,
+      hideCursorInOverviewRuler: true,
+      scrollbar: {
+        verticalScrollbarSize: 8,
+        horizontalScrollbarSize: 8,
+        verticalSliderSize: 5,
+        horizontalSliderSize: 5,
+        useShadows: false,
+        alwaysConsumeMouseWheel: false
+      },
       cursorBlinking: 'smooth',
       cursorSmoothCaretAnimation: 'on',
       padding: { top: 12, bottom: 16 },
