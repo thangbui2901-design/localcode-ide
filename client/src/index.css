@@ -776,13 +776,11 @@ pre {
 }
 
 .ios-view-push {
-  animation: iosViewPushIn 0.34s var(--ease-ios-spring) both;
-  will-change: transform, opacity;
+  animation: iosViewPushIn 0.34s var(--ease-ios-spring) backwards;
 }
 
 .ios-view-pop {
-  animation: iosViewPopIn 0.34s var(--ease-ios-spring) both;
-  will-change: transform, opacity;
+  animation: iosViewPopIn 0.34s var(--ease-ios-spring) backwards;
 }
 
 .zen-orb-a {
@@ -793,7 +791,8 @@ pre {
   animation: zenOrbDriftB 17s ease-in-out infinite;
 }
 
-/* Chế độ Kính Mờ + Hình nền cá nhân (Custom Wallpaper Frosted Glass) */
+/* Chế độ Kính Mờ + Hình nền cá nhân (Custom Wallpaper Frosted Glass) — phủ tràn 100% full màn hình */
+html[data-wallpaper-active='true'],
 [data-wallpaper-active='true'] body,
 [data-wallpaper-active='true'] #root {
   background-color: transparent !important;

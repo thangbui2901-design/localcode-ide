@@ -2687,7 +2687,7 @@ export default function App() {
     <div
       aria-hidden="true"
       style={wallpaperStyle}
-      className="fixed inset-0 z-0 pointer-events-none transition-all duration-500"
+      className="fixed -inset-1 z-0 pointer-events-none transition-all duration-500"
     />
   ) : null;
 
@@ -2951,13 +2951,14 @@ export default function App() {
   /* ===================== MOBILE VIEW ===================== */
   if (breakpoint === 'mobile') {
     return (
-      <div
-        onTouchStart={handleEdgeTouchStart}
-        onTouchEnd={handleEdgeTouchEnd}
-        style={{ backgroundColor: 'var(--bg-canvas)' }}
-        className="glass-canvas ios-view-push w-full h-full flex flex-col overflow-hidden theme-scope relative z-10"
-      >
+      <>
         {renderWallpaperBackdrop}
+        <div
+          onTouchStart={handleEdgeTouchStart}
+          onTouchEnd={handleEdgeTouchEnd}
+          style={{ backgroundColor: 'var(--bg-canvas)' }}
+          className="glass-canvas ios-view-push w-full h-full flex flex-col overflow-hidden theme-scope relative z-10"
+        >
         <header
           style={{
             backgroundColor: 'var(--bg-panel)',
@@ -3252,7 +3253,8 @@ export default function App() {
             problemCount={allDiagnostics.length}
           />
         )}
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -3270,20 +3272,21 @@ export default function App() {
   const projectKey = activeFile?.path || 'workspace';
 
   return (
-    <div
-      onTouchStart={handleEdgeTouchStart}
-      onTouchEnd={handleEdgeTouchEnd}
-      onDragEnter={handleWorkspaceDragEnter}
-      onDragOver={handleWorkspaceDragOver}
-      onDragLeave={handleWorkspaceDragLeave}
-      onDrop={handleWorkspaceDrop}
-      style={{
-        backgroundColor: 'var(--bg-canvas)',
-        color: 'var(--text-primary)'
-      }}
-      className={`glass-canvas ios-view-push w-full h-full flex flex-col ${outerGapClass} overflow-hidden select-none relative z-10`}
-    >
+    <>
       {renderWallpaperBackdrop}
+      <div
+        onTouchStart={handleEdgeTouchStart}
+        onTouchEnd={handleEdgeTouchEnd}
+        onDragEnter={handleWorkspaceDragEnter}
+        onDragOver={handleWorkspaceDragOver}
+        onDragLeave={handleWorkspaceDragLeave}
+        onDrop={handleWorkspaceDrop}
+        style={{
+          backgroundColor: 'var(--bg-canvas)',
+          color: 'var(--text-primary)'
+        }}
+        className={`glass-canvas ios-view-push w-full h-full flex flex-col ${outerGapClass} overflow-hidden select-none relative z-10`}
+      >
 
       {/* AMBIENT MESH ORBS IN CINEMA ZEN MODE */}
       {zenMode && (
@@ -4434,6 +4437,7 @@ export default function App() {
         runningLabel={runningIslandLabel}
         celebrateKey={celebrateKey}
       />
-    </div>
+      </div>
+    </>
   );
 }
