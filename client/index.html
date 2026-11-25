@@ -10,6 +10,20 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Code With You" />
+    <script>
+      try {
+        var t = localStorage.getItem('codeide_ui_theme');
+        if (t) {
+          document.documentElement.setAttribute('data-ui-theme', t);
+          var isLight =
+            t === 'lavender-light' ||
+            t === 'github-light' ||
+            t === 'rose-pine-dawn' ||
+            t === 'solarized-light';
+          document.documentElement.classList.toggle('dark', !isLight);
+        }
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

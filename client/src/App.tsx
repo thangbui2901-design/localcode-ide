@@ -1,4 +1,13 @@
-import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  Suspense,
+  lazy,
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import * as monaco from 'monaco-editor';
 import { FileTypeIcon } from './components/FileTypeIcon';
 import {
@@ -110,6 +119,11 @@ import {
   ensurePointerOriginTracker,
   runThemeRippleTransition
 } from './utils/themeTransition';
+import {
+  isNativeMotionAvailable,
+  runNativePageTransition,
+  syncNativeBackdropColor
+} from './utils/nativeMotion';
 import {
   hapticError,
   hapticLight,
@@ -314,7 +328,26 @@ export default function App() {
 
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const [showSplash, setShowSplash] = useState<boolean>(true);
-  const [showHomeScreen, setShowHomeScreen] = useState<boolean>(true);
+  const [splashPhase, setSplashPhase] = useState<'active' | 'exiting' | 'done'>('active');
+  const [showHomeScreen, setShowHomeScreenRaw] = useState<boolean>(true);
+  const showHomeScreenRef = useRef<boolean>(true);
+  showHomeScreenRef.current = showHomeScreen;
+
+  // Khi cài trên iPad/iPhone (.ipa), mọi thao tác chuyển Home <-> Editor tự động chạy
+  // bằng Swift Native UINavigationController Parallax Spring (120Hz Metal CoreAnimation)!
+  const setShowHomeScreen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    const resolved = typeof next === 'function' ? next(showHomeScreenRef.current) : next;
+    if (resolved === showHomeScreenRef.current) return;
+    showHomeScreenRef.current = resolved;
+    const direction: 'push' | 'pop' = resolved ? 'pop' : 'push';
+    if (isNativeMotionAvailable()) {
+      void runNativePageTransition(direction, () => {
+        setShowHomeScreenRaw(resolved);
+      });
+    } else {
+      setShowHomeScreenRaw(resolved);
+    }
+  }, []);
   const [zenMode, setZenMode] = useState<boolean>(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [celebrateKey, setCelebrateKey] = useState(0);
@@ -324,13 +357,6 @@ export default function App() {
     ensurePointerOriginTracker();
   }, []);
 
-  const handleChangeUiTheme = useCallback((nextTheme: UiThemeId) => {
-    hapticSelection();
-    runThemeRippleTransition(() => {
-      document.documentElement.setAttribute('data-ui-theme', nextTheme);
-      setUiTheme(nextTheme);
-    });
-  }, []);
   const [sheetDragY, setSheetDragY] = useState(0);
   const sheetDragStartRef = useRef<number | null>(null);
   const edgeSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -349,6 +375,105 @@ export default function App() {
   }, [visualPrefs.accentColor]);
 
   const wallpaperStyle = useMemo(() => resolveWallpaperStyle(visualPrefs), [visualPrefs]);
+
+  const lastAppliedMonacoKeyRef = useRef<string>('');
+  const isThemeRipplingRef = useRef<boolean>(false);
+  const activeThemeRef = useRef<UiThemeId>(uiTheme);
+  activeThemeRef.current = isThemeRipplingRef.current ? activeThemeRef.current : uiTheme;
+
+  const syncThemeMetadataAndEditor = useCallback(
+    (themeId: UiThemeId, accentPrimary?: string) => {
+      const meta = getThemeById(themeId);
+      localStorage.setItem('codeide_ui_theme', themeId);
+      document.documentElement.setAttribute('data-ui-theme', themeId);
+      document.documentElement.classList.toggle('dark', meta.mode === 'dark');
+      document.documentElement.style.colorScheme = meta.mode;
+
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) themeMeta.setAttribute('content', meta.bgSwatch);
+      syncNativeBackdropColor(meta.canvasBg);
+
+      const iosStatusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+      if (iosStatusMeta) {
+        iosStatusMeta.setAttribute('content', meta.mode === 'light' ? 'default' : 'black-translucent');
+      }
+      try {
+        const capStatusBar = (window as any).Capacitor?.Plugins?.StatusBar;
+        if (capStatusBar?.setStyle) {
+          void capStatusBar.setStyle({
+            style: meta.mode === 'light' ? 'LIGHT' : 'DARK'
+          });
+        }
+      } catch {
+        // Bỏ qua nếu chạy trên trình duyệt web thông thường
+      }
+
+      setEditorSettings((prev) =>
+        prev.theme === meta.monacoTheme ? prev : { ...prev, theme: meta.monacoTheme }
+      );
+
+      const monacoKey = `${themeId}::${accentPrimary ?? ''}`;
+      if (lastAppliedMonacoKeyRef.current !== monacoKey) {
+        applyMonacoThemeForUi(themeId, accentPrimary);
+        lastAppliedMonacoKeyRef.current = monacoKey;
+      }
+    },
+    []
+  );
+
+  const handleChangeUiTheme = useCallback(
+    (nextTheme: UiThemeId, toastLabel?: string) => {
+      if (nextTheme === activeThemeRef.current) return;
+      activeThemeRef.current = nextTheme;
+      hapticSelection();
+      const nextMeta = getThemeById(nextTheme);
+      const accentPrimary = activeAccentOverride?.primary;
+      const ringAccent = accentPrimary || nextMeta.accentSwatch;
+      const monacoKey = `${nextTheme}::${accentPrimary ?? ''}`;
+
+      isThemeRipplingRef.current = true;
+
+      runThemeRippleTransition(
+        () => {
+          // Siêu nhẹ (< 0.5ms): chỉ đổi attribute CSS biến màu (KHÔNG chạy flushSync re-render 4.500 dòng App.tsx!)
+          document.documentElement.setAttribute('data-ui-theme', nextTheme);
+
+          if (!showHomeScreen) {
+            applyMonacoThemeForUi(nextTheme, accentPrimary);
+            lastAppliedMonacoKeyRef.current = monacoKey;
+          }
+        },
+        {
+          targetBg: nextMeta.canvasBg,
+          accentColor: ringAccent,
+          onFinished: () => {
+            // Đồng bộ React state sau khi sóng tròn đã chạy xong 100% -> 0 khựng ở cả đầu lẫn cuối!
+            startTransition(() => {
+              setUiTheme(nextTheme);
+              if (toastLabel) {
+                showToast(toastLabel, 'info');
+              }
+            });
+
+            const runDeferredMeta = () => {
+              isThemeRipplingRef.current = false;
+              syncThemeMetadataAndEditor(nextTheme, accentPrimary);
+            };
+
+            const ric = (window as unknown as {
+              requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+            }).requestIdleCallback;
+            if (ric) {
+              ric(runDeferredMeta, { timeout: 140 });
+            } else {
+              window.setTimeout(runDeferredMeta, 32);
+            }
+          }
+        }
+      );
+    },
+    [uiTheme, activeAccentOverride, showHomeScreen, showToast, syncThemeMetadataAndEditor]
+  );
   const [pinnedPaths, setPinnedPaths] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('codeide_pinned_paths');
@@ -394,9 +519,12 @@ export default function App() {
   }, [typingSound]);
 
   useEffect(() => {
-    const syncAllMonaco = () => {
+    const monacoKey = `${uiTheme}::${activeAccentOverride?.primary ?? ''}`;
+    const syncAllMonaco = (force = false) => {
+      if (!force && (isThemeRipplingRef.current || lastAppliedMonacoKeyRef.current === monacoKey)) return;
       ensureBuiltInIntelliSense();
       applyMonacoThemeForUi(uiTheme, activeAccentOverride?.primary);
+      lastAppliedMonacoKeyRef.current = monacoKey;
       getAllMonacoNamespaces().forEach((m) => {
         m.editor.getEditors().forEach((ed) => applyEnhancedEditorBehavior(ed));
       });
@@ -404,13 +532,13 @@ export default function App() {
       if (secondaryEditorRef.current) applyEnhancedEditorBehavior(secondaryEditorRef.current);
     };
 
-    syncAllMonaco();
+    syncAllMonaco(false);
 
     const disposables: monaco.IDisposable[] = [];
     getAllMonacoNamespaces().forEach((m) => {
       disposables.push(
         m.editor.onDidCreateEditor((ed) => {
-          syncAllMonaco();
+          syncAllMonaco(true);
           applyEnhancedEditorBehavior(ed);
         })
       );
@@ -749,48 +877,16 @@ export default function App() {
   }, [themePickerOpen]);
 
   useEffect(() => {
-    localStorage.setItem('codeide_ui_theme', uiTheme);
     localStorage.setItem('codeide_ui_density', uiDensity);
-
-    document.documentElement.setAttribute('data-ui-theme', uiTheme);
     document.documentElement.setAttribute('data-ui-density', uiDensity);
-    document.documentElement.classList.toggle('dark', currentThemeObj.mode === 'dark');
-    document.documentElement.style.colorScheme = currentThemeObj.mode;
-
-    // Đồng bộ màu thanh trạng thái iOS/iPadOS & Safari theo Dark / Light theme
-    const themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) {
-      themeMeta.setAttribute('content', currentThemeObj.bgSwatch);
-    }
-    const iosStatusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-    if (iosStatusMeta) {
-      iosStatusMeta.setAttribute(
-        'content',
-        currentThemeObj.mode === 'light' ? 'default' : 'black-translucent'
-      );
-    }
-    try {
-      const capStatusBar = (window as any).Capacitor?.Plugins?.StatusBar;
-      if (capStatusBar?.setStyle) {
-        void capStatusBar.setStyle({
-          style: currentThemeObj.mode === 'light' ? 'LIGHT' : 'DARK'
-        });
-      }
-    } catch {
-      // Bỏ qua nếu chạy trên trình duyệt web thông thường
-    }
-
-    setEditorSettings((prev) => ({ ...prev, theme: currentThemeObj.monacoTheme }));
-    applyMonacoThemeForUi(uiTheme);
-    const timer = window.setTimeout(() => applyMonacoThemeForUi(uiTheme), 100);
-    return () => window.clearTimeout(timer);
-  }, [uiTheme, uiDensity, currentThemeObj]);
+    if (isThemeRipplingRef.current) return;
+    syncThemeMetadataAndEditor(uiTheme, activeAccentOverride?.primary);
+  }, [uiTheme, uiDensity, activeAccentOverride, syncThemeMetadataAndEditor]);
 
   const cycleNextTheme = () => {
-    const idx = UI_THEMES.findIndex((t) => t.id === uiTheme);
+    const idx = UI_THEMES.findIndex((t) => t.id === activeThemeRef.current);
     const next = UI_THEMES[(idx + 1) % UI_THEMES.length];
-    handleChangeUiTheme(next.id);
-    showToast(`Theme: ${next.name}`, 'info');
+    handleChangeUiTheme(next.id, `Theme: ${next.name}`);
   };
 
   const isFocusMode = zenMode;
@@ -2880,7 +2976,20 @@ export default function App() {
     return (
       <>
         {renderWallpaperBackdrop}
-        {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+        {showSplash && (
+          <SplashScreen
+            themeMode={currentThemeObj.mode}
+            bgHex={currentThemeObj.canvasBg}
+            accentColor={activeAccentOverride?.primary || currentThemeObj.accentSwatch}
+            onExitStart={() => {
+              setSplashPhase('exiting');
+            }}
+            onFinish={() => {
+              setShowSplash(false);
+              setSplashPhase('done');
+            }}
+          />
+        )}
 
         <HomeScreen
           breakpoint={breakpoint}
@@ -2924,7 +3033,11 @@ export default function App() {
           onDeleteEntry={handleDeleteEntry}
           onExportBackup={handleExportBackup}
           onImportBackup={handleImportBackup}
-          onReplaySplash={() => setShowSplash(true)}
+          onReplaySplash={() => {
+            setSplashPhase('active');
+            setShowSplash(true);
+          }}
+          splashPhase={splashPhase}
         />
 
         {renderCommandPalette}
@@ -2981,7 +3094,9 @@ export default function App() {
           onTouchStart={handleEdgeTouchStart}
           onTouchEnd={handleEdgeTouchEnd}
           style={{ backgroundColor: 'var(--bg-canvas)' }}
-          className="glass-canvas ios-view-push w-full h-full flex flex-col overflow-hidden theme-scope relative z-10"
+          className={`glass-canvas ${
+            isNativeMotionAvailable() ? '' : 'ios-view-push'
+          } w-full h-full flex flex-col overflow-hidden theme-scope relative z-10`}
         >
         <header
           style={{
@@ -3341,7 +3456,9 @@ export default function App() {
               ? 'max(8px, env(safe-area-inset-left))'
               : 'max(12px, env(safe-area-inset-left))'
         }}
-        className={`glass-canvas ios-view-push w-full h-full flex flex-col ${outerGapClass} overflow-hidden select-none relative z-10`}
+        className={`glass-canvas ${
+          isNativeMotionAvailable() ? '' : 'ios-view-push'
+        } w-full h-full flex flex-col ${outerGapClass} overflow-hidden select-none relative z-10`}
       >
 
       {/* AMBIENT MESH ORBS IN CINEMA ZEN MODE */}

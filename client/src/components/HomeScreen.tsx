@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { DeviceBreakpoint, FileNode, SupportedLanguage, WorkspaceFile } from '../types/ide';
 import { FileTypeIcon } from './FileTypeIcon';
+import { isNativeMotionAvailable } from '../utils/nativeMotion';
 
 export type QuickStartKind =
   | 'python'
@@ -67,6 +68,7 @@ interface HomeScreenProps {
   onExportBackup: () => void;
   onImportBackup: (file: File) => void;
   onReplaySplash?: () => void;
+  splashPhase?: 'active' | 'exiting' | 'done';
 }
 
 interface RecentProjectItem {
@@ -509,7 +511,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onDeleteEntry,
   onExportBackup,
   onImportBackup,
-  onReplaySplash
+  onReplaySplash,
+  splashPhase = 'done'
 }) => {
   const [filter, setFilter] = useState<ProjectFilter>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
@@ -647,6 +650,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     { kind: 'css', label: 'CSS3', engine: 'Hot Reload', badge: <CssBadge /> }
   ];
 
+  // Chỉ chạy ios-view-pop khi HomeScreen được mở lại từ Editor (KHÔNG chạy sau khi Welcome Screen kết thúc -> 0 giật!)
+  const mountedWithSplashRef = useRef(splashPhase !== 'done');
+  if (splashPhase === 'active') {
+    mountedWithSplashRef.current = true;
+  }
+  const allowPopAnimation =
+    !mountedWithSplashRef.current && splashPhase === 'done' && !isNativeMotionAvailable();
+
   const filterOptions: Array<{ id: ProjectFilter; label: string }> = [
     { id: 'all', label: 'Tất cả' },
     { id: 'folders', label: 'Thư mục' },
@@ -658,7 +669,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   return (
     <div
       style={{ backgroundColor: 'var(--bg-canvas)', color: 'var(--text-primary)' }}
-      className="glass-canvas ios-view-pop w-full h-full flex flex-col overflow-hidden select-none relative z-10"
+      className={`glass-canvas ${
+        allowPopAnimation ? 'ios-view-pop' : ''
+      } ${
+        splashPhase === 'active'
+          ? 'home-reveal-waiting'
+          : splashPhase === 'exiting'
+            ? 'home-reveal-exiting'
+            : ''
+      } w-full h-full flex flex-col overflow-hidden select-none relative z-10`}
       onClick={() => {
         if (swipedRowId) setSwipedRowId(null);
       }}
@@ -672,7 +691,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           paddingLeft: 'max(16px, env(safe-area-inset-left))',
           paddingRight: 'max(16px, env(safe-area-inset-right))'
         }}
-        className="glass-surface w-full shrink-0 relative z-20"
+        className="glass-surface home-reveal-header w-full shrink-0 relative z-20"
       >
         <div className="h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -680,7 +699,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             type="button"
             onClick={onOpenProjects}
             style={{ color: 'var(--text-primary)' }}
-            className="w-9 h-9 rounded-xl hover:bg-[var(--bg-panel)] flex items-center justify-center shrink-0 btn-lift"
+            className="home-reveal-header-chrome w-9 h-9 rounded-xl hover:bg-[var(--bg-panel)] flex items-center justify-center shrink-0 btn-lift"
             title="Mở Workspace Explorer"
           >
             <Menu size={20} />
@@ -693,12 +712,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             title="Bấm để xem lại hoạt họa logo"
           >
             <img
+              data-home-logo="true"
               src="/app-logo.png"
               alt="Code With You"
-              className="w-7 h-7 rounded-lg object-contain shrink-0 group-active:scale-90 transition-transform"
+              className="home-reveal-logo w-7 h-7 rounded-lg object-contain shrink-0 group-active:scale-90 transition-transform"
             />
             <span
-              className="text-[15px] font-bold tracking-tight truncate"
+              className="home-reveal-header-chrome text-[15px] font-bold tracking-tight truncate"
               style={{ color: 'var(--text-primary)' }}
             >
               Code With You
@@ -706,7 +726,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="home-reveal-header-chrome flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={onOpenCommandPalette}
@@ -734,7 +754,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="hidden sm:flex h-9 px-2.5 rounded-xl hover:bg-[var(--bg-panel)] items-center gap-1.5 text-xs font-medium btn-lift"
             title="Đổi nhanh chủ đề màu"
           >
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: themeSwatch }} />
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--accent-primary)' }} />
             <Palette size={15} />
           </button>
 
@@ -763,8 +783,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="max-w-5xl mx-auto space-y-6 sm:space-y-7">
           {/* ===== SECTION 1: CLEAN EDITORIAL HERO HEADER ===== */}
           <section
-            style={{ animationDelay: '20ms' }}
-            className="home-stagger flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1 pb-1"
+            style={{ transitionDelay: splashPhase !== 'done' ? '30ms' : undefined }}
+            className="home-reveal-item flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1 pb-1"
           >
             {/* Left Minimal Greeting + Useful Stats */}
             <div className="min-w-0">
@@ -850,7 +870,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </section>
 
           {/* ===== SECTION 2: PRO QUICK START TEMPLATES ===== */}
-          <section style={{ animationDelay: '90ms' }} className="home-stagger space-y-3">
+          <section
+            style={{ transitionDelay: splashPhase !== 'done' ? '80ms' : undefined }}
+            className="home-reveal-item space-y-3"
+          >
             <div className="flex items-center justify-between px-1">
               <h2 className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                 Khởi tạo nhanh
@@ -879,9 +902,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   style={{
                     backgroundColor: 'var(--bg-panel)',
                     boxShadow: 'var(--shadow-card)',
-                    animationDelay: `${110 + idx * 40}ms`
+                    transitionDelay: splashPhase !== 'done' ? `${90 + idx * 28}ms` : undefined
                   }}
-                  className="home-badge-pop spotlight-card glass-surface rounded-2xl p-2.5 sm:p-3.5 flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-3 text-center sm:text-left hover:bg-[var(--bg-elevated)] transition-colors btn-lift"
+                  className="home-reveal-item spotlight-card glass-surface rounded-2xl p-2.5 sm:p-3.5 flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-3 text-center sm:text-left hover:bg-[var(--bg-elevated)] btn-lift"
                 >
                   {tpl.badge}
                   <div className="min-w-0">
@@ -936,7 +959,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </section>
 
           {/* ===== SECTION 3: RECENT PROJECTS WORKSPACE BROWSER ===== */}
-          <section style={{ animationDelay: '150ms' }} className="home-stagger space-y-3">
+          <section
+            style={{ transitionDelay: splashPhase !== 'done' ? '140ms' : undefined }}
+            className="home-reveal-item space-y-3"
+          >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-0.5">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                 <h2 className="text-sm font-bold tracking-tight shrink-0 mr-1" style={{ color: 'var(--text-primary)' }}>
@@ -1159,8 +1185,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           {/* COMPACT WORKSPACE UTILITY FOOTER (BACKUP / RESTORE) */}
           <section
-            style={{ backgroundColor: 'var(--bg-panel)' }}
-            className="glass-surface rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs"
+            style={{
+              backgroundColor: 'var(--bg-panel)',
+              transitionDelay: splashPhase !== 'done' ? '185ms' : undefined
+            }}
+            className="home-reveal-item glass-surface rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs"
           >
             <span style={{ color: 'var(--text-secondary)' }}>
               Dữ liệu lưu cục bộ trên máy • <strong style={{ color: 'var(--text-primary)' }}>{files.length} tệp</strong> ({formatBytes(totalSizeBytes)})
@@ -1203,7 +1232,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           paddingLeft: 'max(16px, env(safe-area-inset-left))',
           paddingRight: 'max(16px, env(safe-area-inset-right))'
         }}
-        className="fixed inset-x-0 bottom-0 select-none pt-1 z-30 pointer-events-none"
+        className="home-reveal-nav fixed inset-x-0 bottom-0 select-none pt-1 z-30 pointer-events-none"
       >
         <div
           style={{

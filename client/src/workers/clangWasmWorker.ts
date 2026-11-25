@@ -1152,10 +1152,12 @@ workerCtx.onmessage = async (event: MessageEvent<WorkerPayload>) => {
       const clangArgs = [
         isC ? 'clang' : 'clang++',
         stdFlag,
+        ...(isC ? [] : ['-fno-exceptions']),
         '-O1',
         '-Wall',
         '-I.',
         '-fno-color-diagnostics',
+        '-Wl,-z,stack-size=8388608',
         entryName,
         ...extraSourceNames,
         '-o',
@@ -1217,9 +1219,13 @@ workerCtx.onmessage = async (event: MessageEvent<WorkerPayload>) => {
           }
           errText = textDecoder.decode(mergedErr).trim();
         }
-        const finalErr =
+        let finalErr =
           errText ||
           (compileErr instanceof Error ? compileErr.message : 'Lỗi biên dịch C/C++ Offline');
+        if (/with exceptions disabled|__cxa_(?:allocate_exception|throw)/i.test(finalErr)) {
+          finalErr +=
+            '\n\n[Gợi ý Offline Clang WASM] Bộ thư viện WASI C++ offline không hỗ trợ cú pháp try/catch/throw. Nếu bài làm bắt buộc dùng try/catch/throw, hãy chuyển sang Cloud GCC trong Cài đặt → Biên dịch.';
+        }
         workerCtx.postMessage({ type: 'stderr', text: `${finalErr}\n` });
         workerCtx.postMessage({
           type: 'done',

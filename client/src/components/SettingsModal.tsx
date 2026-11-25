@@ -281,7 +281,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         opacity: backdropOpacity,
         transition: isDragging ? 'none' : 'opacity 0.28s var(--ease-ios-out)'
       }}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-5 select-none"
+      className="fixed inset-0 z-50 bg-black/62 flex items-end sm:items-center justify-center sm:p-5 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -297,7 +297,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             : closing
               ? 'transform 0.26s var(--ease-ios-spring), opacity 0.22s ease'
               : 'transform 0.36s var(--ease-ios-spring), opacity 0.24s var(--ease-ios-out)',
-          willChange: 'transform, opacity'
+          willChange: isDragging || !entered || closing ? 'transform, opacity' : undefined
         }}
         className="w-full sm:max-w-2xl h-[86vh] sm:h-[600px] max-h-[88vh] rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
       >
@@ -512,7 +512,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               ? `2px solid ${item.accentSwatch}`
                               : '2px solid transparent'
                           }}
-                          className="p-2.5 rounded-2xl text-left transition-all btn-lift space-y-2"
+                          className="p-2.5 rounded-2xl text-left btn-lift space-y-2"
                         >
                           {/* Mini code preview card with real theme syntax palette */}
                           <div
@@ -1438,7 +1438,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Code With You
                     </div>
                     <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                      Phiên bản 2.5 • iPadOS &amp; iOS Standalone IDE
+                      Phiên bản 2.6 • iPadOS &amp; iOS Standalone IDE
                     </div>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Info, AlertCircle } from 'lucide-react';
+import { playNativeConfettiBurst } from '../utils/nativeMotion';
 
 export type ToastTone = 'success' | 'info' | 'error';
 
@@ -39,9 +40,13 @@ export const FloatingToast: React.FC<FloatingToastProps> = ({
   celebrateKey = 0
 }) => {
   const [activeBurstId, setActiveBurstId] = useState(0);
+  const [useDomConfetti, setUseDomConfetti] = useState(true);
 
   useEffect(() => {
     if (!celebrateKey) return;
+    // Trên iPad/iPhone (.ipa), dùng Apple Metal CAEmitterLayer Confetti 120Hz (0 DOM node)
+    const firedNative = playNativeConfettiBurst();
+    setUseDomConfetti(!firedNative);
     setActiveBurstId(celebrateKey);
     const timer = window.setTimeout(() => {
       setActiveBurstId(0);
@@ -75,8 +80,8 @@ export const FloatingToast: React.FC<FloatingToastProps> = ({
       }}
       className="fixed left-1/2 -translate-x-1/2 z-[90] pointer-events-none flex justify-center px-3 max-w-[92vw]"
     >
-      {/* Subtle Micro-Confetti Burst khi đạt 100% AC */}
-      {activeBurstId > 0 && (
+      {/* Subtle Micro-Confetti Burst khi đạt 100% AC (chỉ dùng DOM trên Web; trên iPad dùng Metal CAEmitterLayer) */}
+      {activeBurstId > 0 && useDomConfetti && (
         <div key={`burst-${activeBurstId}`} className="absolute top-3 left-1/2 pointer-events-none">
           {CONFETTI_PARTICLES.map((p, idx) => (
             <span

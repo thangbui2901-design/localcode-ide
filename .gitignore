@@ -8,8 +8,8 @@ client/dist/
 client/.vite/
 server/dist/
 
-# Capacitor / iOS generated artifacts
-ios/
+# Capacitor / iOS generated artifacts (chỉ bỏ thư mục /ios/ sinh ra ở gốc, vẫn giữ native-motion/ios/)
+/ios/
 Payload/
 *.ipa
 

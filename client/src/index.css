@@ -243,7 +243,6 @@ body {
   background-color: var(--bg-canvas);
   color: var(--text-primary);
   height: 100%;
-  transition: background-color 0.28s var(--ease-ios-out), color 0.28s var(--ease-ios-out);
   font-family: var(--font-apple-ui);
   letter-spacing: -0.008em;
   overscroll-behavior: none;
@@ -274,11 +273,7 @@ pre {
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
   box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transition:
-    background-color 0.28s var(--ease-ios-out),
-    border-color 0.28s var(--ease-ios-out),
-    border-radius 0.28s var(--ease-ios-out),
-    box-shadow 0.28s var(--ease-ios-out);
+  transition: border-radius 0.28s var(--ease-ios-out);
 }
 
 [data-ui-density='compact'] .ide-card {
@@ -309,12 +304,8 @@ pre {
 
 .btn-lift {
   transition:
-    transform 0.24s var(--ease-ios-bounce),
-    box-shadow 0.22s var(--ease-ios-out),
-    background-color 0.2s ease,
-    color 0.2s ease,
-    opacity 0.2s ease;
-  will-change: transform;
+    transform 0.22s var(--ease-ios-bounce),
+    opacity 0.18s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -836,8 +827,19 @@ html[data-wallpaper-active='true'],
 }
 
 /* =====================================================================
-   CIRCULAR THEME RIPPLE (VIEW TRANSITIONS API) + STAGGER + SPOTLIGHT + CONFETTI
+   CHUYỂN CẢNH ĐỔI THEME + WELCOME -> HOME + STAGGER + SPOTLIGHT + CONFETTI
+   (iPad/iPhone .ipa dùng Swift Native CoreAnimation; Web dùng View Transition siêu nhẹ)
    ===================================================================== */
+
+html.theme-rippling .transition-colors,
+html.theme-rippling .transition-all {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+::view-transition-group(root) {
+  animation: none;
+}
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
@@ -851,6 +853,100 @@ html[data-wallpaper-active='true'],
 
 ::view-transition-new(root) {
   z-index: 9999;
+}
+
+/* Chuyển cảnh đồng bộ mượt Welcome Screen -> Home (GPU thuần transform + opacity, KHÔNG remount / KHÔNG blur) */
+.home-reveal-exiting .home-reveal-item {
+  transition:
+    transform 0.56s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
+
+.home-reveal-waiting .home-reveal-item {
+  opacity: 0 !important;
+  transform: translate3d(0, 26px, 0) scale(0.975) !important;
+  transition: none !important;
+}
+
+/* Giữ vị trí Header 100% cố định (không translateY) để Splash đo đúng pixel vị trí Logo góc trái */
+.home-reveal-exiting .home-reveal-header {
+  transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1) 100ms;
+}
+
+.home-reveal-waiting .home-reveal-header {
+  opacity: 0 !important;
+  transition: none !important;
+}
+
+/* Logo góc trên trái trên Home chỉ hiện mượt ngay khoảnh khắc Logo Welcome bay đáp xuống khớp 1:1 */
+.home-reveal-exiting .home-reveal-logo {
+  transition: opacity 0.22s ease 420ms;
+}
+
+.home-reveal-waiting .home-reveal-logo {
+  opacity: 0 !important;
+  transition: none !important;
+}
+
+.home-reveal-exiting .home-reveal-header-chrome {
+  transition:
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1) 140ms,
+    opacity 0.38s ease 140ms;
+}
+
+.home-reveal-waiting .home-reveal-header-chrome {
+  opacity: 0 !important;
+  transform: translate3d(0, -8px, 0) !important;
+  transition: none !important;
+}
+
+.home-reveal-exiting .home-reveal-nav {
+  transition:
+    transform 0.54s cubic-bezier(0.22, 1, 0.36, 1) 150ms,
+    opacity 0.42s ease 150ms;
+  will-change: transform, opacity;
+}
+
+.home-reveal-waiting .home-reveal-nav {
+  opacity: 0 !important;
+  transform: translate3d(0, 30px, 0) scale(0.94) !important;
+  transition: none !important;
+}
+
+@keyframes splashPortalRing {
+  0% {
+    opacity: 0.85;
+    transform: translate3d(0, 0, 0) scale(0.62);
+  }
+  55% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(5.6);
+  }
+}
+
+@keyframes splashPortalRingSoft {
+  0% {
+    opacity: 0.55;
+    transform: translate3d(0, 0, 0) scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(7.2);
+  }
+}
+
+.splash-portal-ring {
+  animation: splashPortalRing 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.splash-portal-ring-soft {
+  animation: splashPortalRingSoft 0.82s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+  will-change: transform, opacity;
 }
 
 @keyframes homeCascadeIn {
@@ -1222,7 +1318,8 @@ html[data-wallpaper-active='true'],
    THANH CUỘN LIQUID-GLASS FLOATING PILL (TOÀN APP + MONACO EDITOR & DIFF)
    ===================================================================== */
 
-* {
+/* scrollbar-color có tính kế thừa tự nhiên -> chỉ khai báo 1 lần trên html thay vì * để tránh tính lại color-mix() hàng nghìn lần khi đổi theme */
+html {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text-secondary) 30%, transparent) transparent;
 }
