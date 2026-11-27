@@ -6,6 +6,7 @@ import {
   Box,
   PenTool,
   FileText,
+  Sparkles,
   PanelRight,
   PanelBottom,
   Move,
@@ -21,6 +22,7 @@ interface LeftActivityPillProps {
   consoleDock: 'bottom' | 'right';
   bottomOpen: boolean;
   rightTool: IpadRightTool;
+  showAiTool?: boolean;
   trackpadOpen: boolean;
   hardwareKeyboardMode: boolean;
   shortcutsHudOpen: boolean;
@@ -43,6 +45,7 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
   consoleDock,
   bottomOpen,
   rightTool,
+  showAiTool = true,
   trackpadOpen,
   hardwareKeyboardMode,
   shortcutsHudOpen,
@@ -55,10 +58,19 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
   onOpenShortcutsHud
 }) => {
   const pillContainerStyle: React.CSSProperties = {
-    backgroundColor: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
-    border: '1px solid var(--border-subtle)',
-    boxShadow: 'var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.07)'
+    backgroundColor: 'var(--bg-panel)',
+    boxShadow: 'var(--shadow-card)'
   };
+
+  const activeRingStyle = (activeIdx: number): React.CSSProperties => ({
+    opacity: activeIdx >= 0 ? 1 : 0,
+    transform:
+      activeIdx >= 0
+        ? `translate3d(0, calc(${activeIdx} * (100% + 4px)), 0) scale(1)`
+        : 'translate3d(0, 0, 0) scale(0.76)',
+    transition: 'transform 0.4s cubic-bezier(0.34, 1.32, 0.64, 1), opacity 0.2s ease',
+    backgroundColor: 'var(--bg-panel-alt)'
+  });
 
   const topActiveIndex = diffOpen
     ? 2
@@ -71,47 +83,38 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
           : -1;
 
   const rightConsoleActive = bottomOpen && consoleDock === 'right' && rightTool === null;
+  const aiSlotOffset = showAiTool ? 1 : 0;
   const middleActiveIndex =
     rightTool === 'scratchpad'
       ? 0
       : rightTool === 'notes'
         ? 1
-        : rightConsoleActive
+        : showAiTool && rightTool === 'ai'
           ? 2
-          : trackpadOpen
-            ? 3
-            : -1;
+          : rightConsoleActive
+            ? 2 + aiSlotOffset
+            : trackpadOpen
+              ? 3 + aiSlotOffset
+              : -1;
 
   const bottomActiveIndex = shortcutsHudOpen ? 1 : hardwareKeyboardMode ? 0 : -1;
 
   return (
     <nav
       aria-label="Thanh công cụ bên trái"
-      className="shrink-0 flex flex-col items-center justify-between gap-2 pt-0.5 pb-0.5 overflow-y-auto no-scrollbar select-none z-20"
+      className="shrink-0 flex flex-col items-center justify-between gap-2 overflow-y-auto no-scrollbar select-none z-20"
     >
       <div className="flex flex-col items-center gap-2">
-        {/* Top Pill: Workspace & Navigation (vòng kính nổi trượt lò xo dọc mượt) */}
+        {/* Top Pill: Workspace & Navigation — Borderless Soft Bento Capsule */}
         <div
           style={pillContainerStyle}
-          className="rounded-full p-1 sm:p-1.5 backdrop-blur-lg"
+          className="rounded-2xl p-1 sm:p-1.5"
         >
           <div className="relative flex flex-col items-center gap-1">
             <div
               aria-hidden="true"
-              style={{
-                opacity: topActiveIndex >= 0 ? 1 : 0,
-                transform:
-                  topActiveIndex >= 0
-                    ? `translate3d(0, calc(${topActiveIndex} * (100% + 4px)), 0) scale(1)`
-                    : 'translate3d(0, 0, 0) scale(0.72)',
-                transition:
-                  'transform 0.42s cubic-bezier(0.34, 1.38, 0.64, 1), opacity 0.22s ease',
-                backgroundColor: 'color-mix(in srgb, var(--text-primary) 12%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--text-primary) 17%, transparent)',
-                boxShadow:
-                  'inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 12px -2px rgba(0, 0, 0, 0.38)'
-              }}
-              className="pointer-events-none absolute top-0 left-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full"
+              style={activeRingStyle(topActiveIndex)}
+              className="pointer-events-none absolute top-0 left-0 w-8 h-8 sm:w-9 sm:h-9 rounded-[11px]"
             />
 
             <button
@@ -164,28 +167,16 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
           </div>
         </div>
 
-        {/* Middle Pill: iPad Pro Workspace Tools (vòng kính nổi trượt lò xo dọc mượt) */}
+        {/* Middle Pill: iPad Pro Workspace Tools — Borderless Soft Bento Capsule */}
         <div
           style={pillContainerStyle}
-          className="rounded-full p-1 sm:p-1.5 backdrop-blur-lg"
+          className="rounded-2xl p-1 sm:p-1.5"
         >
           <div className="relative flex flex-col items-center gap-1">
             <div
               aria-hidden="true"
-              style={{
-                opacity: middleActiveIndex >= 0 ? 1 : 0,
-                transform:
-                  middleActiveIndex >= 0
-                    ? `translate3d(0, calc(${middleActiveIndex} * (100% + 4px)), 0) scale(1)`
-                    : 'translate3d(0, 0, 0) scale(0.72)',
-                transition:
-                  'transform 0.42s cubic-bezier(0.34, 1.38, 0.64, 1), opacity 0.22s ease',
-                backgroundColor: 'color-mix(in srgb, var(--text-primary) 12%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--text-primary) 17%, transparent)',
-                boxShadow:
-                  'inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 12px -2px rgba(0, 0, 0, 0.38)'
-              }}
-              className="pointer-events-none absolute top-0 left-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full"
+              style={activeRingStyle(middleActiveIndex)}
+              className="pointer-events-none absolute top-0 left-0 w-8 h-8 sm:w-9 sm:h-9 rounded-[11px]"
             />
 
             <button
@@ -212,6 +203,20 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
               <FileText size={15} strokeWidth={rightTool === 'notes' ? 2 : 1.75} />
             </button>
 
+            {showAiTool && (
+              <button
+                type="button"
+                onClick={() => onToggleRightTool('ai')}
+                title="Trợ lý AI Gemini 4 (⌘⇧I)"
+                style={{
+                  color: rightTool === 'ai' ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                }}
+                className="relative z-10 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center hover:text-[var(--text-primary)] active:scale-90 transition-all duration-200 shrink-0"
+              >
+                <Sparkles size={15} strokeWidth={rightTool === 'ai' ? 2.15 : 1.8} />
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onToggleConsoleDock}
@@ -235,7 +240,7 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
               style={{
                 color: trackpadOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
                 backgroundColor:
-                  trackpadOpen && middleActiveIndex !== 3
+                  trackpadOpen && middleActiveIndex !== 3 + aiSlotOffset
                     ? 'color-mix(in srgb, var(--text-primary) 10%, transparent)'
                     : undefined
               }}
@@ -247,28 +252,16 @@ export const LeftActivityPill: React.FC<LeftActivityPillProps> = React.memo(({
         </div>
       </div>
 
-      {/* Bottom Pill: Hardware Keyboard Mode & Magic Keyboard HUD (vòng kính trượt lò xo mượt) */}
+      {/* Bottom Pill: Hardware Keyboard Mode & Magic Keyboard HUD — Borderless Soft Bento Capsule */}
       <div
         style={pillContainerStyle}
-        className="rounded-full p-1 sm:p-1.5 backdrop-blur-lg shrink-0"
+        className="rounded-2xl p-1 sm:p-1.5 shrink-0"
       >
         <div className="relative flex flex-col items-center gap-1">
           <div
             aria-hidden="true"
-            style={{
-              opacity: bottomActiveIndex >= 0 ? 1 : 0,
-              transform:
-                bottomActiveIndex >= 0
-                  ? `translate3d(0, calc(${bottomActiveIndex} * (100% + 4px)), 0) scale(1)`
-                  : 'translate3d(0, 0, 0) scale(0.72)',
-              transition:
-                'transform 0.42s cubic-bezier(0.34, 1.38, 0.64, 1), opacity 0.22s ease',
-              backgroundColor: 'color-mix(in srgb, var(--text-primary) 12%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--text-primary) 17%, transparent)',
-              boxShadow:
-                'inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 12px -2px rgba(0, 0, 0, 0.38)'
-            }}
-            className="pointer-events-none absolute top-0 left-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full"
+            style={activeRingStyle(bottomActiveIndex)}
+            className="pointer-events-none absolute top-0 left-0 w-8 h-8 sm:w-9 sm:h-9 rounded-[11px]"
           />
 
           <button

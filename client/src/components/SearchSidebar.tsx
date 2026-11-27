@@ -43,14 +43,11 @@ export const SearchSidebar: React.FC<SearchSidebarProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col select-none bg-transparent overflow-hidden">
-      {/* Pill Search Input matching OutlinePanel */}
+      {/* Borderless Tonal Pill Search Input matching OutlinePanel */}
       <div className="px-3 pb-2.5 shrink-0">
         <div
-          style={{
-            backgroundColor: 'var(--bg-panel-alt)',
-            border: '1px solid var(--border-subtle)'
-          }}
-          className="h-9 px-2.5 rounded-xl flex items-center gap-2 transition-colors focus-within:border-[var(--accent-primary)]"
+          style={{ backgroundColor: 'var(--bg-panel-alt)' }}
+          className="h-9 px-2.5 rounded-[10px] flex items-center gap-2 transition-all focus-within:ring-1 focus-within:ring-[var(--accent-primary)]/45"
         >
           <SearchIcon size={13} className="shrink-0 opacity-65" style={{ color: 'var(--text-secondary)' }} />
           <input

@@ -10,7 +10,8 @@ import {
   Download,
   Grid,
   X,
-  Hand
+  Hand,
+  Sparkles
 } from 'lucide-react';
 
 interface StrokePoint {
@@ -32,6 +33,7 @@ interface PencilScratchpadProps {
   projectKey: string;
   onClose: () => void;
   onExportToast?: (msg: string) => void;
+  onAskAiWithSketch?: (imageDataUrl: string, thumbUrl: string) => void;
 }
 
 const PEN_COLORS = [
@@ -52,7 +54,8 @@ function storageKeyFor(projectKey: string): string {
 export const PencilScratchpad: React.FC<PencilScratchpadProps> = ({
   projectKey,
   onClose,
-  onExportToast
+  onExportToast,
+  onAskAiWithSketch
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -335,6 +338,45 @@ export const PencilScratchpad: React.FC<PencilScratchpadProps> = ({
     onExportToast?.('Đã xuất ảnh bảng nháp thuật toán');
   };
 
+  const handleSendToAi = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || strokes.length === 0 || !onAskAiWithSketch) return;
+
+    const themeEl = canvas.closest('[data-ui-theme]') || document.documentElement;
+    const bg = getComputedStyle(themeEl).getPropertyValue('--bg-panel').trim() || '#0D0E13';
+
+    // 768px giúp Gemini Vision đọc nét bút siêu nhanh (~3x ít token ảnh hơn 1280px) mà vẫn cực rõ
+    const maxDim = 768;
+    const scale = Math.min(1, maxDim / Math.max(canvas.width, canvas.height));
+    const w = Math.max(1, Math.round(canvas.width * scale));
+    const h = Math.max(1, Math.round(canvas.height * scale));
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    const ctx = out.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(canvas, 0, 0, w, h);
+    const jpegUrl = out.toDataURL('image/jpeg', 0.82);
+
+    const thumbMax = 200;
+    const tScale = Math.min(1, thumbMax / Math.max(w, h));
+    const tCanvas = document.createElement('canvas');
+    tCanvas.width = Math.max(1, Math.round(w * tScale));
+    tCanvas.height = Math.max(1, Math.round(h * tScale));
+    const tCtx = tCanvas.getContext('2d');
+    let thumbUrl = jpegUrl;
+    if (tCtx) {
+      tCtx.fillStyle = bg;
+      tCtx.fillRect(0, 0, tCanvas.width, tCanvas.height);
+      tCtx.drawImage(out, 0, 0, tCanvas.width, tCanvas.height);
+      thumbUrl = tCanvas.toDataURL('image/jpeg', 0.74);
+    }
+
+    onAskAiWithSketch(jpegUrl, thumbUrl);
+  };
+
   const paperBgStyle: React.CSSProperties =
     paper === 'dots'
       ? {
@@ -354,32 +396,46 @@ export const PencilScratchpad: React.FC<PencilScratchpadProps> = ({
       style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)' }}
       className="h-full flex flex-col overflow-hidden select-none"
     >
-      {/* Top Bar */}
+      {/* Borderless Top Bar matching AI & Notes */}
       <div
-        style={{
-          backgroundColor: 'var(--bg-panel-alt)',
-          borderBottom: '1px solid var(--border-subtle)'
-        }}
-        className="px-3 py-2 flex items-center justify-between gap-2 shrink-0"
+        style={{ backgroundColor: 'var(--bg-panel)' }}
+        className="h-11 px-3 flex items-center justify-between gap-2 shrink-0"
       >
         <div className="flex items-center gap-2 min-w-0">
           <PenTool size={14} style={{ color: 'var(--accent-primary)' }} className="shrink-0" />
-          <span className="text-xs font-bold truncate">Bảng nháp Apple Pencil</span>
+          <span className="text-[12.5px] font-bold tracking-tight truncate">Bảng nháp</span>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {onAskAiWithSketch && (
+            <button
+              type="button"
+              onClick={handleSendToAi}
+              disabled={strokes.length === 0}
+              style={{
+                backgroundColor: strokes.length > 0 ? 'var(--bg-active)' : 'var(--bg-panel-alt)',
+                color: strokes.length > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)'
+              }}
+              className="h-7 px-2.5 rounded-lg text-[10.5px] font-bold flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
+              title="Gửi trực tiếp hình vẽ trên bảng nháp sang Trợ lý AI Gemini 4 phân tích"
+            >
+              <Sparkles size={11.5} />
+              <span>Hỏi AI</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setPencilOnly((v) => !v)}
-            className={`px-2 py-1 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-colors ${
+            className={`h-7 px-2 rounded-lg text-[10.5px] font-semibold flex items-center gap-1 transition-colors ${
               pencilOnly
                 ? 'bg-[var(--bg-active)] text-[var(--accent-primary)]'
-                : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                : 'bg-[var(--bg-panel-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
             title="Bật chống chạm lòng bàn tay (chỉ nhận Apple Pencil)"
           >
             <Hand size={11} />
-            <span>{pencilOnly ? 'Chỉ Pencil' : 'Bút & Tay'}</span>
+            <span className="hidden sm:inline">{pencilOnly ? 'Chỉ Pencil' : 'Bút & Tay'}</span>
           </button>
 
           <button
@@ -387,7 +443,7 @@ export const PencilScratchpad: React.FC<PencilScratchpadProps> = ({
             onClick={() =>
               setPaper((p) => (p === 'dots' ? 'grid' : p === 'grid' ? 'blank' : 'dots'))
             }
-            className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center"
+            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-panel-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
             title={`Nền giấy: ${paper === 'dots' ? 'Chấm bi' : paper === 'grid' ? 'Ô vuông' : 'Trống'}`}
           >
             <Grid size={13} />
@@ -396,7 +452,7 @@ export const PencilScratchpad: React.FC<PencilScratchpadProps> = ({
           <button
             type="button"
             onClick={handleExportPng}
-            className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center"
+            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-panel-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
             title="Xuất ảnh PNG"
           >
             <Download size={13} />
@@ -405,7 +461,7 @@ export const PencilScratchpad: React.FC<PencilScratchpadProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center"
+            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-panel-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
             title="Đóng bảng nháp"
           >
             <X size={14} />
@@ -413,13 +469,10 @@ export const PencilScratchpad: React.FC<PencilScratchpadProps> = ({
         </div>
       </div>
 
-      {/* Tools Palette */}
+      {/* Borderless Floating Tools Palette */}
       <div
-        style={{
-          backgroundColor: 'var(--bg-panel)',
-          borderBottom: '1px solid var(--border-subtle)'
-        }}
-        className="px-2.5 py-2 flex items-center justify-between gap-2 flex-wrap shrink-0"
+        style={{ backgroundColor: 'var(--bg-panel)' }}
+        className="px-2.5 pb-2 flex items-center justify-between gap-2 flex-wrap shrink-0"
       >
         <div className="flex items-center gap-1 bg-[var(--bg-panel-alt)] p-0.5 rounded-xl">
           {[

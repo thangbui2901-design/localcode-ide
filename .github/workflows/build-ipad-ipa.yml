@@ -68,8 +68,8 @@ jobs:
         run: |
           PLIST="ios/App/App/Info.plist"
           plutil -replace CFBundleDisplayName -string "Code With You" "$PLIST"
-          plutil -replace CFBundleShortVersionString -string "2.6" "$PLIST"
-          plutil -replace CFBundleVersion -string "26" "$PLIST"
+          plutil -replace CFBundleShortVersionString -string "2.7" "$PLIST"
+          plutil -replace CFBundleVersion -string "27" "$PLIST"
           plutil -replace UIFileSharingEnabled -bool true "$PLIST"
           plutil -replace LSSupportsOpeningDocumentsInPlace -bool true "$PLIST"
           plutil -replace UIRequiresFullScreen -bool false "$PLIST"

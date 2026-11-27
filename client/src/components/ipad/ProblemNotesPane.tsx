@@ -147,10 +147,7 @@ export const ProblemNotesPane: React.FC<ProblemNotesPaneProps> = ({
           nodes.push(
             <pre
               key={`code-${i}`}
-              style={{
-                backgroundColor: 'var(--bg-canvas)',
-                border: '1px solid var(--border-subtle)'
-              }}
+              style={{ backgroundColor: 'var(--bg-canvas)' }}
               className="my-2 p-2.5 rounded-xl font-mono text-[11px] overflow-x-auto leading-relaxed"
             >
               {codeBuf.join('\n')}
@@ -210,24 +207,22 @@ export const ProblemNotesPane: React.FC<ProblemNotesPaneProps> = ({
       className="h-full flex flex-col overflow-hidden"
       onPaste={handlePaste}
     >
-      {/* Header */}
+      {/* Borderless Header matching AI & Console */}
       <div
-        style={{
-          backgroundColor: 'var(--bg-panel-alt)',
-          borderBottom: '1px solid var(--border-subtle)'
-        }}
-        className="px-3 py-2 flex items-center justify-between gap-2 shrink-0"
+        style={{ backgroundColor: 'var(--bg-panel)' }}
+        className="h-11 px-3 flex items-center justify-between gap-2 shrink-0"
       >
         <div className="flex items-center gap-2 min-w-0">
           <FileText size={14} style={{ color: 'var(--accent-primary)' }} className="shrink-0" />
-          <span className="text-xs font-bold truncate">Đề bài &amp; Ghi chú</span>
+          <span className="text-[12.5px] font-bold tracking-tight truncate">Đề bài &amp; Ghi chú</span>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={() => setPreviewMode((v) => !v)}
-            className="px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[10px] font-semibold flex items-center gap-1 text-[var(--text-primary)]"
+            style={{ backgroundColor: 'var(--bg-panel-alt)', color: 'var(--text-primary)' }}
+            className="h-7 px-2.5 rounded-lg text-[10.5px] font-semibold flex items-center gap-1 hover:bg-[var(--bg-elevated)] transition-colors"
           >
             {previewMode ? <Edit3 size={11} /> : <Eye size={11} />}
             <span>{previewMode ? 'Sửa' : 'Xem đẹp'}</span>
@@ -236,10 +231,11 @@ export const ProblemNotesPane: React.FC<ProblemNotesPaneProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center"
-            title="Chèn ảnh đề bài (hoặc dán Cmd+V)"
+            style={{ color: 'var(--text-secondary)' }}
+            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-panel-alt)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
+            title="Chèn ảnh đề bài (hoặc dán Ctrl+V / Cmd+V)"
           >
-            <ImagePlus size={13} />
+            <ImagePlus size={13.5} />
           </button>
           <input
             ref={fileInputRef}
@@ -256,7 +252,8 @@ export const ProblemNotesPane: React.FC<ProblemNotesPaneProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center"
+            style={{ color: 'var(--text-secondary)' }}
+            className="w-7 h-7 rounded-lg hover:bg-[var(--bg-panel-alt)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
           >
             <X size={14} />
           </button>
@@ -305,13 +302,10 @@ export const ProblemNotesPane: React.FC<ProblemNotesPaneProps> = ({
           />
         )}
 
-        {/* Smart Extracted Samples Banner */}
+        {/* Smart Extracted Samples Banner — Borderless */}
         {detectedSamples.length > 0 && (
           <div
-            style={{
-              backgroundColor: 'var(--bg-active)',
-              border: '1px solid var(--border-subtle)'
-            }}
+            style={{ backgroundColor: 'var(--bg-active)' }}
             className="p-2.5 rounded-xl space-y-2"
           >
             <div className="flex items-center justify-between gap-2">
@@ -336,12 +330,9 @@ export const ProblemNotesPane: React.FC<ProblemNotesPaneProps> = ({
           </div>
         )}
 
-        {/* Quick Manual Sample -> Tests Sender */}
+        {/* Quick Manual Sample -> Tests Sender — Borderless */}
         <div
-          style={{
-            backgroundColor: 'var(--bg-panel-alt)',
-            border: '1px solid var(--border-subtle)'
-          }}
+          style={{ backgroundColor: 'var(--bg-panel-alt)' }}
           className="p-2.5 rounded-xl space-y-2"
         >
           <div className="flex items-center justify-between">

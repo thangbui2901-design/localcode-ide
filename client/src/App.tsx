@@ -68,9 +68,10 @@ import {
 } from './services/pistonRunner';
 import { ExplorerSidebar } from './components/ExplorerSidebar';
 import { SearchSidebar } from './components/SearchSidebar';
-import { CodeEditor } from './components/CodeEditor';
+import { CodeEditor, EditorCodeSelection } from './components/CodeEditor';
 import { BottomPanel, TerminalChunk } from './components/BottomPanel';
 import { StatusBar } from './components/StatusBar';
+import { CustomSelect } from './components/CustomSelect';
 import { MobileCodingToolbar } from './components/MobileCodingToolbar';
 import { MobileNav, MobileTab } from './components/MobileNav';
 import { HeaderTimer } from './components/HeaderTimer';
@@ -96,6 +97,11 @@ const PencilScratchpad = lazy(() =>
 const ProblemNotesPane = lazy(() =>
   import('./components/ipad/ProblemNotesPane').then((m) => ({ default: m.ProblemNotesPane }))
 );
+const AiAssistantPane = lazy(() =>
+  import('./components/ipad/AiAssistantPane').then((m) => ({ default: m.AiAssistantPane }))
+);
+import type { AiAutoPromptRequest } from './components/ipad/AiAssistantPane';
+import { AiSettings, loadAiSettings, saveAiSettings } from './services/geminiAi';
 const DiffViewerModal = lazy(() =>
   import('./components/ipad/DiffViewerModal').then((m) => ({ default: m.DiffViewerModal }))
 );
@@ -183,11 +189,13 @@ function applyMonacoThemeForUi(themeId: UiThemeId, accentOverride?: string) {
           colors: {
             'editor.background': themeMeta.bgSwatch,
             'editor.foreground': syn.foreground,
-            'editor.lineHighlightBackground': '#FFFFFF0B',
-            'editor.selectionBackground': `${accentHex}44`,
+            'editor.lineHighlightBackground': '#FFFFFF08',
+            'editor.selectionBackground': `${accentHex}38`,
             'editorCursor.foreground': accentHex,
             'editorLineNumber.foreground': syn.lineNumber,
             'editorLineNumber.activeForeground': accentHex,
+            'editorIndentGuide.background1': '#FFFFFF10',
+            'editorIndentGuide.activeBackground1': `${accentHex}55`,
             focusBorder: '#00000000'
           }
         });
@@ -206,11 +214,13 @@ function applyMonacoThemeForUi(themeId: UiThemeId, accentOverride?: string) {
           colors: {
             'editor.background': themeMeta.bgSwatch,
             'editor.foreground': syn.foreground,
-            'editor.lineHighlightBackground': '#00000008',
-            'editor.selectionBackground': `${accentHex}28`,
+            'editor.lineHighlightBackground': '#00000006',
+            'editor.selectionBackground': `${accentHex}24`,
             'editorCursor.foreground': accentHex,
             'editorLineNumber.foreground': syn.lineNumber,
             'editorLineNumber.activeForeground': accentHex,
+            'editorIndentGuide.background1': '#00000010',
+            'editorIndentGuide.activeBackground1': `${accentHex}55`,
             focusBorder: '#00000000'
           }
         });
@@ -604,7 +614,7 @@ export default function App() {
   const [renderedSidebarView, setRenderedSidebarView] = useState<'explorer' | 'search' | 'outline'>(
     'explorer'
   );
-  const [renderedRightKind, setRenderedRightKind] = useState<'scratchpad' | 'notes' | 'console'>(
+  const [renderedRightKind, setRenderedRightKind] = useState<'scratchpad' | 'notes' | 'ai' | 'console'>(
     'scratchpad'
   );
   const [tabletDrawerMounted, setTabletDrawerMounted] = useState(false);
@@ -663,6 +673,23 @@ export default function App() {
   const shortcutsHudMounted = useMountOnce(shortcutsHudOpen);
   const scratchpadMounted = useMountOnce(ipadRightTool === 'scratchpad');
   const notesMounted = useMountOnce(ipadRightTool === 'notes');
+  const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadAiSettings());
+  const [mobileAiOpen, setMobileAiOpen] = useState(false);
+  const [aiAutoPrompt, setAiAutoPrompt] = useState<AiAutoPromptRequest | null>(null);
+  const [editorSelection, setEditorSelection] = useState<EditorCodeSelection | null>(null);
+  const aiMounted = useMountOnce(ipadRightTool === 'ai' || mobileAiOpen);
+
+  const handleUpdateAiSettings = useCallback((patch: Partial<AiSettings>) => {
+    setAiSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveAiSettings(next);
+      if (patch.showDockButton === false) {
+        setIpadRightTool((cur) => (cur === 'ai' ? null : cur));
+        setMobileAiOpen(false);
+      }
+      return next;
+    });
+  }, []);
   const [isDragOverWorkspace, setIsDragOverWorkspace] = useState(false);
   const [requestedConsoleTab, setRequestedConsoleTab] = useState<{
     tab: 'terminal' | 'input' | 'tests' | 'problems';
@@ -2388,6 +2415,103 @@ export default function App() {
     setIpadRightTool((prev) => (prev === tool ? null : tool));
   }, []);
 
+  const handleApplyAiCode = useCallback(
+    (nextCode: string, openDiffAfter = false) => {
+      if (!activeFile || activeFile.language === 'asset') return;
+      const prevContent = liveContentMapRef.current[activeFile.path] ?? activeFile.content;
+      setFileSnapshots((prev) => ({ ...prev, [activeFile.path]: prevContent }));
+      handleCodeChange(activeFile, nextCode);
+      const ed = activeEditorRef.current;
+      if (ed && ed.getValue() !== nextCode) {
+        const model = ed.getModel();
+        if (model) {
+          ed.executeEdits('ai-apply', [
+            {
+              range: model.getFullModelRange(),
+              text: nextCode,
+              forceMoveMarkers: true
+            }
+          ]);
+        } else {
+          ed.setValue(nextCode);
+        }
+      }
+      showToast(`Đã lưu bản gốc & áp dụng vào ${activeFile.name}`, 'success');
+      if (openDiffAfter) {
+        setDiffOpen(true);
+      }
+    },
+    [activeFile, activeEditorRef, handleCodeChange, showToast]
+  );
+
+  const handleInsertAiCode = useCallback(
+    (snippet: string) => {
+      if (!activeFile || activeFile.language === 'asset') return;
+      const ed = activeEditorRef.current;
+      if (ed) {
+        const sel = ed.getSelection();
+        if (sel) {
+          ed.executeEdits('ai-insert', [
+            { range: sel, text: snippet, forceMoveMarkers: true }
+          ]);
+          ed.focus();
+          showToast('Đã chèn đoạn mã vào vị trí con trỏ', 'success');
+          return;
+        }
+      }
+      const prevContent = liveContentMapRef.current[activeFile.path] ?? activeFile.content;
+      handleCodeChange(activeFile, `${prevContent}\n${snippet}`);
+      showToast(`Đã chèn đoạn mã vào cuối ${activeFile.name}`, 'success');
+    },
+    [activeFile, activeEditorRef, handleCodeChange, showToast]
+  );
+
+  const handleAskAiAboutError = useCallback(() => {
+    hapticSelection();
+    if (breakpoint === 'mobile') {
+      setMobileTab('editor');
+      setMobileAiOpen(true);
+    } else {
+      setIpadRightTool('ai');
+    }
+    setAiAutoPrompt({
+      id: Date.now(),
+      prompt:
+        'Hãy giải thích chi tiết lỗi biên dịch / runtime vừa xuất hiện trong Console, chỉ rõ dòng bị sai và hướng dẫn cách sửa gọn nhất.',
+      includeCode: true,
+      includeConsole: true
+    });
+  }, [breakpoint]);
+
+  const handleSendScratchpadToAi = useCallback(
+    (imageDataUrl: string, thumbUrl: string) => {
+      hapticSelection();
+      const base64Data = imageDataUrl.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
+      if (!base64Data) return;
+      if (breakpoint === 'mobile') {
+        setMobileTab('editor');
+        setMobileAiOpen(true);
+      } else {
+        setIpadRightTool('ai');
+      }
+      setAiAutoPrompt({
+        id: Date.now(),
+        prompt: 'Hãy đọc và giải thích ngắn gọn nội dung / hình vẽ tay trên bảng nháp này.',
+        includeCode: false,
+        includeConsole: false,
+        attachedImage: {
+          mimeType: 'image/jpeg',
+          data: base64Data,
+          previewUrl: imageDataUrl,
+          thumbUrl,
+          resolution: 'low'
+        }
+      });
+      showToast('Đã gửi hình vẽ bảng nháp sang Trợ lý AI', 'info');
+    },
+    [breakpoint, showToast]
+  );
+
   const handleSendSampleToTests = useCallback(
     (input: string, expectedOutput: string, name?: string) => {
       const nextIdx = activeTestCases.length + 1;
@@ -2679,6 +2803,14 @@ export default function App() {
       } else if (key === 'n' && e.shiftKey) {
         e.preventDefault();
         handleToggleRightTool('notes');
+      } else if (key === 'i' && e.shiftKey) {
+        e.preventDefault();
+        setShowHomeScreen(false);
+        if (breakpoint === 'mobile') {
+          setMobileAiOpen((v) => !v);
+        } else {
+          handleToggleRightTool('ai');
+        }
       } else if (key === 'k' && !e.shiftKey) {
         e.preventDefault();
         setLogs([]);
@@ -2834,6 +2966,21 @@ export default function App() {
       action: () => {
         setShowHomeScreen(false);
         handleQuickNewFile();
+      }
+    },
+    {
+      id: 'toggle-ai-assistant',
+      title: 'Mở / Đóng Trợ lý AI Gemini 4',
+      subtitle: 'Giải thích lỗi, gợi ý thuật toán & review code',
+      shortcut: '⌘⇧I',
+      icon: <Sparkles size={15} className="text-purple-400" />,
+      action: () => {
+        setShowHomeScreen(false);
+        if (breakpoint === 'mobile') {
+          setMobileAiOpen((v) => !v);
+        } else {
+          handleToggleRightTool('ai');
+        }
       }
     },
     {
@@ -3070,6 +3217,8 @@ export default function App() {
               offlineCppPercent={offlineCppPercent}
               visualPrefs={visualPrefs}
               onUpdateVisualPrefs={handleUpdateVisualPrefs}
+              aiSettings={aiSettings}
+              onUpdateAiSettings={handleUpdateAiSettings}
             />
           </Suspense>
         )}
@@ -3146,6 +3295,25 @@ export default function App() {
               >
                 <Play size={12} fill="currentColor" />
                 <span>{isWebLanguage(activeFile?.language) ? 'Live' : 'Run'}</span>
+              </button>
+            )}
+
+            {aiSettings.showDockButton && (
+              <button
+                type="button"
+                onClick={() => {
+                  hapticSelection();
+                  setMobileMoreOpen(false);
+                  setMobileAiOpen(true);
+                }}
+                style={{
+                  backgroundColor: 'var(--bg-active)',
+                  color: 'var(--accent-primary)'
+                }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl btn-lift"
+                title="Trợ lý AI Gemini 4"
+              >
+                <Sparkles size={16} />
               </button>
             )}
 
@@ -3260,6 +3428,7 @@ export default function App() {
                   onSave={() => saveFile(primaryFile || undefined, undefined, true)}
                   onRun={handleRun}
                   onCursorChange={(line, column) => setCursor({ line, column })}
+                  onSelectionChange={setEditorSelection}
                   onQuickCreateTemplate={handleCreateTemplateFile}
                   onQuickCreateWebProject={handleCreateWebStarterProject}
                 />
@@ -3355,12 +3524,61 @@ export default function App() {
                     }, 50);
                   }}
                   onClose={() => setMobileTab('editor')}
+                  onAskAiError={aiSettings.showDockButton ? handleAskAiAboutError : undefined}
                   isSheet
                 />
               </div>
             </div>
           )}
         </div>
+
+        {/* MOBILE iOS SHEET CHO TRỢ LÝ AI GEMINI 4 */}
+        {mobileAiOpen && (
+          <div
+            onClick={() => setMobileAiOpen(false)}
+            style={{
+              paddingTop: 'max(28px, env(safe-area-inset-top))'
+            }}
+            className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end ios-backdrop-enter"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: 'var(--bg-panel)',
+                borderTop: '1px solid var(--border-subtle)',
+                boxShadow: '0 -18px 48px -10px rgba(0, 0, 0, 0.55)'
+              }}
+              className="w-full h-[84dvh] max-h-[calc(100dvh-42px)] rounded-t-3xl overflow-hidden flex flex-col ios-sheet-enter"
+            >
+              <Suspense fallback={null}>
+                <AiAssistantPane
+                  activeFile={activeFile}
+                  activeCode={
+                    activeFile ? (liveContentMapRef.current[activeFile.path] ?? activeFile.content) : ''
+                  }
+                  codeSelection={editorSelection}
+                  projectKey={activeFile?.path || 'workspace'}
+                  logs={logs}
+                  diagnostics={allDiagnostics}
+                  settings={aiSettings}
+                  onUpdateSettings={handleUpdateAiSettings}
+                  onApplyCodeToFile={handleApplyAiCode}
+                  onInsertCodeAtCursor={handleInsertAiCode}
+                  onOpenDiffViewer={() => {
+                    setMobileAiOpen(false);
+                    setDiffOpen(true);
+                  }}
+                  onClose={() => setMobileAiOpen(false)}
+                  autoPrompt={aiAutoPrompt}
+                  onConsumeAutoPrompt={(id) =>
+                    setAiAutoPrompt((cur) => (cur?.id === id ? null : cur))
+                  }
+                  isSheet
+                />
+              </Suspense>
+            </div>
+          </div>
+        )}
 
         {mobileTab === 'settings' && (
           <Suspense fallback={null}>
@@ -3390,6 +3608,8 @@ export default function App() {
               offlineCppPercent={offlineCppPercent}
               visualPrefs={visualPrefs}
               onUpdateVisualPrefs={handleUpdateVisualPrefs}
+              aiSettings={aiSettings}
+              onUpdateAiSettings={handleUpdateAiSettings}
             />
           </Suspense>
         )}
@@ -3537,17 +3757,16 @@ export default function App() {
           </button>
         </div>
 
-        {/* Center: Sleek Full-Pill Frosted Search Bar (giống ô Search bo tròn trên đỉnh ảnh mẫu) */}
+        {/* Center: Sleek Borderless Tonal Search Pill */}
         <button
           type="button"
           onClick={() => setCommandPaletteOpen(true)}
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
-            border: '1px solid var(--border-subtle)',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+            backgroundColor: 'var(--bg-panel)',
+            boxShadow: 'var(--shadow-card)',
             color: 'var(--text-secondary)'
           }}
-          className="hidden sm:flex flex-1 max-w-md h-9 px-3.5 rounded-full items-center justify-between gap-2 text-xs hover:bg-[var(--bg-elevated)]/70 transition-colors min-w-0 backdrop-blur-xl"
+          className="hidden sm:flex flex-1 max-w-md h-9 px-3.5 rounded-full items-center justify-between gap-2 text-xs hover:bg-[var(--bg-panel-alt)] transition-colors min-w-0"
           title="Mở Command Palette & tìm tệp nhanh (⌘P)"
         >
           <div className="flex items-center gap-2 min-w-0">
@@ -3557,18 +3776,16 @@ export default function App() {
             </span>
           </div>
           <kbd
-            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
+            style={{ backgroundColor: 'var(--bg-panel-alt)', color: 'var(--text-secondary)' }}
             className="px-2 py-0.5 rounded-full font-mono text-[10px] shrink-0"
           >
-            ⌘P
+            {/Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent) ? '⌘P' : 'Ctrl+P'}
           </kbd>
         </button>
 
-        {/* Right Controls — Quiet Native macOS / iPadOS Toolbar */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Right Controls — Quiet Minimal macOS / iPadOS Toolbar */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <HeaderTimer />
-
-          <span className="w-px h-4 mx-1 opacity-70" style={{ backgroundColor: 'var(--border-subtle)' }} />
 
           <div className="relative" ref={themeMenuRef}>
             <button
@@ -3588,10 +3805,11 @@ export default function App() {
               <div
                 style={{
                   backgroundColor: 'var(--bg-panel)',
-                  border: '1px solid var(--border-subtle)',
+                  boxShadow:
+                    '0 20px 50px -12px rgba(0, 0, 0, 0.42), 0 0 0 1px color-mix(in srgb, var(--text-primary) 6%, transparent)',
                   color: 'var(--text-primary)'
                 }}
-                className="absolute right-0 mt-2 w-80 max-w-[90vw] max-h-[75vh] overflow-y-auto rounded-2xl p-3.5 z-50 ios-popover-enter shadow-2xl"
+                className="absolute right-0 mt-2 w-80 max-w-[90vw] max-h-[75vh] overflow-y-auto rounded-2xl p-3.5 z-50 ios-popover-enter"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
@@ -3702,18 +3920,16 @@ export default function App() {
 
           <button
             onClick={() => setSettingsOpen(true)}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/75 transition-colors"
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] transition-colors"
             title="Cài đặt chi tiết"
           >
             <Settings size={15} />
           </button>
 
-          <span className="w-px h-4 mx-1 opacity-70" style={{ backgroundColor: 'var(--border-subtle)' }} />
-
           {isRunning ? (
             <button
               onClick={handleKill}
-              className="h-8 px-4 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-500/25 btn-lift"
+              className="h-8 px-3.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center gap-1.5 ml-0.5 btn-lift"
             >
               <Square size={11} fill="currentColor" />
               <span>Stop</span>
@@ -3721,9 +3937,9 @@ export default function App() {
           ) : (
             <button
               onClick={handleRun}
-              className="h-8 px-4 rounded-full run-btn font-bold text-xs flex items-center gap-1.5 btn-lift"
+              className="h-8 px-3.5 rounded-full run-btn font-bold text-xs flex items-center gap-1.5 ml-0.5 btn-lift"
             >
-              <Play size={12} fill="currentColor" />
+              <Play size={11.5} fill="currentColor" />
               <span>{isWebLanguage(activeFile?.language) ? 'Go Live' : 'Run'}</span>
             </button>
           )}
@@ -3745,6 +3961,7 @@ export default function App() {
             consoleDock={consoleDock}
             bottomOpen={bottomOpen}
             rightTool={ipadRightTool}
+            showAiTool={aiSettings.showDockButton}
             trackpadOpen={trackpadOpen}
             hardwareKeyboardMode={Boolean(editorSettings.hardwareKeyboardMode)}
             shortcutsHudOpen={shortcutsHudOpen}
@@ -3866,16 +4083,13 @@ export default function App() {
 
         {/* RIGHT COLUMN: EDITOR (+ LIVE SERVER PREVIEW) ON TOP + TERMINAL AT BOTTOM */}
         <div className={`flex-1 min-w-0 min-h-0 flex flex-col ${uiDensity === 'compact' ? 'gap-1.5' : 'gap-2.5'}`}>
-          {/* EDITOR CARD — RECESSED LIQUID-GLASS TABS (GIỐNG ẢNH MẪU) */}
+          {/* EDITOR CARD — BORDERLESS FLOATING PILL TABS (CONCENTRIC APPLE BENTO) */}
           <main className="flex-1 min-w-0 min-h-0 ide-card flex flex-col overflow-hidden">
             <div
-              style={{
-                backgroundColor: 'var(--bg-panel)',
-                borderBottom: '1px solid var(--border-subtle)'
-              }}
-              className="h-11 flex items-stretch justify-between shrink-0"
+              style={{ backgroundColor: 'var(--bg-panel)' }}
+              className="h-11 px-2 flex items-center justify-between gap-2 shrink-0"
             >
-              <div className="flex-1 min-w-0 flex items-stretch overflow-x-auto no-scrollbar">
+              <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {openTabs.map((tab) => {
                   const isActive = activeFile?.path === tab.path;
                   return (
@@ -3883,19 +4097,16 @@ export default function App() {
                       key={tab.path}
                       onClick={() => openFileInActivePane(tab)}
                       style={{
-                        backgroundColor: isActive
-                          ? 'color-mix(in srgb, var(--text-primary) 7%, transparent)'
-                          : 'transparent',
-                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        borderRight: '1px solid var(--border-subtle)'
+                        backgroundColor: isActive ? 'var(--bg-panel-alt)' : 'transparent',
+                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)'
                       }}
-                      className={`group relative px-4 text-[13px] flex items-center gap-2.5 cursor-pointer shrink-0 transition-colors ${
+                      className={`group relative h-8 px-3 rounded-[10px] text-[12.5px] flex items-center gap-2 cursor-pointer shrink-0 transition-colors ${
                         isActive
-                          ? 'font-medium'
-                          : 'font-normal opacity-75 hover:opacity-100 hover:bg-[var(--bg-elevated)]/30'
+                          ? 'font-semibold'
+                          : 'font-normal opacity-80 hover:opacity-100 hover:bg-[var(--bg-panel-alt)]/55'
                       }`}
                     >
-                      <FileTypeIcon fileName={tab.name} size={15} />
+                      <FileTypeIcon fileName={tab.name} size={14} />
                       <span className="truncate max-w-[160px]">{tab.name}</span>
                       {tab.dirty && (
                         <span
@@ -3909,7 +4120,7 @@ export default function App() {
                           isActive ? 'opacity-65 hover:opacity-100' : 'opacity-0 group-hover:opacity-75 hover:!opacity-100'
                         } hover:bg-[var(--bg-elevated)]`}
                       >
-                        <X size={13} />
+                        <X size={12.5} />
                       </button>
                     </div>
                   );
@@ -3918,23 +4129,23 @@ export default function App() {
                 <button
                   onClick={handleQuickNewFile}
                   style={{ color: 'var(--text-secondary)' }}
-                  className="px-3 hover:bg-[var(--bg-elevated)]/40 hover:text-[var(--text-primary)] transition-colors flex items-center justify-center shrink-0"
+                  className="w-7 h-7 rounded-lg hover:bg-[var(--bg-panel-alt)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center shrink-0 ml-0.5"
                   title="Tạo nhanh tệp mới"
                 >
-                  <Plus size={15} />
+                  <Plus size={14} />
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 px-2.5 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 {activeBreadcrumbSymbol && (
                   <button
                     type="button"
                     onClick={() => setSidebarView('outline')}
                     style={{
-                      backgroundColor: 'color-mix(in srgb, var(--text-primary) 5%, transparent)',
+                      backgroundColor: 'var(--bg-panel-alt)',
                       color: 'var(--text-secondary)'
                     }}
-                    className="hidden lg:inline-flex h-7 px-2.5 rounded-full text-[11px] font-mono items-center gap-1 hover:text-[var(--text-primary)] transition-colors mr-1"
+                    className="hidden lg:inline-flex h-7 px-2.5 rounded-lg text-[11px] font-mono items-center gap-1 hover:text-[var(--text-primary)] transition-colors mr-0.5"
                     title="Vị trí hàm hiện tại (bấm mở Outline)"
                   >
                     <span>{activeBreadcrumbSymbol.name}</span>
@@ -3948,7 +4159,7 @@ export default function App() {
                       backgroundColor: livePreviewOpen ? 'var(--bg-active)' : 'transparent',
                       color: livePreviewOpen ? 'var(--accent-primary)' : 'var(--text-secondary)'
                     }}
-                    className="h-7 px-2.5 rounded-full text-[11px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-panel-alt)] hover:text-[var(--text-primary)] transition-colors"
                     title="Bật / Tắt Live Server xem trước web theo thời gian thực"
                   >
                     <Radio
@@ -3962,7 +4173,7 @@ export default function App() {
                 <button
                   onClick={handleFormat}
                   style={{ color: 'var(--text-secondary)' }}
-                  className="h-7 px-2.5 rounded-full text-[11px] font-medium flex items-center gap-1.5 hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+                  className="h-7 px-2.5 rounded-lg text-[11px] font-medium flex items-center gap-1.5 hover:bg-[var(--bg-panel-alt)] hover:text-[var(--text-primary)] transition-colors"
                   title="Định dạng mã nguồn"
                 >
                   <Wand2 size={13} />
@@ -3984,20 +4195,18 @@ export default function App() {
               >
                 {splitOpen && (
                   <div className="h-8 px-3 bg-[var(--bg-panel-alt)] flex items-center justify-between text-[11px]">
-                    <select
+                    <CustomSelect
                       value={primaryPath || ''}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         flushLiveContent();
-                        setPrimaryPath(e.target.value);
+                        setPrimaryPath(val);
                       }}
-                      className="bg-transparent text-[var(--text-primary)] outline-none cursor-pointer truncate max-w-[85%]"
-                    >
-                      {files.map((f) => (
-                        <option key={f.path} value={f.path}>
-                          {f.path}
-                        </option>
-                      ))}
-                    </select>
+                      size="xs"
+                      variant="ghost"
+                      align="left"
+                      className="max-w-[85%]"
+                      options={files.map((f) => ({ value: f.path, label: f.path }))}
+                    />
                     <span className="px-2 py-0.5 rounded-md bg-[var(--bg-active)] text-[10px] font-semibold">
                       PANE 1
                     </span>
@@ -4016,6 +4225,9 @@ export default function App() {
                   onFocusEditor={() => setActivePane('primary')}
                   onCursorChange={(line, column) => {
                     if (activePane === 'primary') setCursor({ line, column });
+                  }}
+                  onSelectionChange={(sel) => {
+                    if (activePane === 'primary') setEditorSelection(sel);
                   }}
                   onChangeFontSize={(sz) => setEditorSettings((prev) => ({ ...prev, fontSize: sz }))}
                   onQuickCreateTemplate={handleCreateTemplateFile}
@@ -4071,20 +4283,18 @@ export default function App() {
                     }`}
                   >
                     <div className="h-8 px-3 bg-[var(--bg-panel-alt)] flex items-center justify-between text-[11px]">
-                      <select
+                      <CustomSelect
                         value={secondaryPath || ''}
-                        onChange={(e) => {
+                        onChange={(val) => {
                           flushLiveContent();
-                          setSecondaryPath(e.target.value);
+                          setSecondaryPath(val);
                         }}
-                        className="bg-transparent text-[var(--text-primary)] outline-none cursor-pointer truncate max-w-[80%]"
-                      >
-                        {files.map((f) => (
-                          <option key={f.path} value={f.path}>
-                            {f.path}
-                          </option>
-                        ))}
-                      </select>
+                        size="xs"
+                        variant="ghost"
+                        align="left"
+                        className="max-w-[80%]"
+                        options={files.map((f) => ({ value: f.path, label: f.path }))}
+                      />
                       <div className="flex items-center gap-1.5">
                         <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-500 text-[10px] font-semibold">
                           PANE 2
@@ -4116,6 +4326,9 @@ export default function App() {
                       onCursorChange={(line, column) => {
                         if (activePane === 'secondary') setCursor({ line, column });
                       }}
+                      onSelectionChange={(sel) => {
+                        if (activePane === 'secondary') setEditorSelection(sel);
+                      }}
                       onChangeFontSize={(sz) => setEditorSettings((prev) => ({ ...prev, fontSize: sz }))}
                       onQuickCreateTemplate={handleCreateTemplateFile}
                       onQuickCreateWebProject={handleCreateWebStarterProject}
@@ -4139,6 +4352,17 @@ export default function App() {
               </div>
             )}
           </main>
+
+          {/* INVISIBLE HOVER-ONLY RESIZE HANDLE IN GAP BETWEEN EDITOR & CONSOLE */}
+          {breakpoint === 'desktop' && !zenMode && bottomOpen && consoleDock === 'bottom' && (
+            <div
+              onPointerDown={startResizeBottom}
+              title="Kéo lên / xuống để chỉnh chiều cao Console"
+              className="h-1.5 -my-1 cursor-row-resize touch-none flex items-center justify-center group shrink-0 z-10"
+            >
+              <span className="w-12 h-0.5 rounded-full bg-transparent group-hover:bg-[var(--accent-primary)] transition-colors" />
+            </div>
+          )}
 
           {/* BOTTOM TERMINAL / CONSOLE CARD — 2-WAY LIQUID-GLASS SPRING EXPAND/COLLAPSE */}
           {breakpoint === 'desktop' && !zenMode && (
@@ -4175,15 +4399,6 @@ export default function App() {
                 }}
                 className="w-full ide-card flex flex-col overflow-hidden relative"
               >
-                <div
-                  onPointerDown={startResizeBottom}
-                  title="Kéo lên / xuống để chỉnh chiều cao Console"
-                  style={{ backgroundColor: 'var(--bg-panel-alt)' }}
-                  className="h-3 w-full cursor-row-resize touch-none flex items-center justify-center group shrink-0"
-                >
-                  <span className="w-10 h-1 rounded-full bg-[var(--bg-hover)] group-hover:bg-[var(--accent-primary)] transition-colors" />
-                </div>
-
                 <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                   <BottomPanel
                     mode={mode}
@@ -4224,6 +4439,7 @@ export default function App() {
                     dockPosition={consoleDock}
                     onToggleDockPosition={handleToggleConsoleDock}
                     requestedTab={requestedConsoleTab}
+                    onAskAiError={aiSettings.showDockButton ? handleAskAiAboutError : undefined}
                   />
                 </div>
               </section>
@@ -4283,6 +4499,9 @@ export default function App() {
                         projectKey={projectKey}
                         onClose={() => setIpadRightTool(null)}
                         onExportToast={(msg) => showToast(msg, 'success')}
+                        onAskAiWithSketch={
+                          aiSettings.showDockButton ? handleSendScratchpadToAi : undefined
+                        }
                       />
                     </Suspense>
                   ) : null
@@ -4293,6 +4512,33 @@ export default function App() {
                         projectKey={projectKey}
                         onSendSampleToTests={handleSendSampleToTests}
                         onClose={() => setIpadRightTool(null)}
+                      />
+                    </Suspense>
+                  ) : null
+                ) : renderedRightKind === 'ai' ? (
+                  aiMounted ? (
+                    <Suspense fallback={null}>
+                      <AiAssistantPane
+                        activeFile={activeFile}
+                        activeCode={
+                          activeFile
+                            ? (liveContentMapRef.current[activeFile.path] ?? activeFile.content)
+                            : ''
+                        }
+                        codeSelection={editorSelection}
+                        projectKey={projectKey}
+                        logs={logs}
+                        diagnostics={allDiagnostics}
+                        settings={aiSettings}
+                        onUpdateSettings={handleUpdateAiSettings}
+                        onApplyCodeToFile={handleApplyAiCode}
+                        onInsertCodeAtCursor={handleInsertAiCode}
+                        onOpenDiffViewer={() => setDiffOpen(true)}
+                        onClose={() => setIpadRightTool(null)}
+                        autoPrompt={aiAutoPrompt}
+                        onConsumeAutoPrompt={(id) =>
+                          setAiAutoPrompt((cur) => (cur?.id === id ? null : cur))
+                        }
                       />
                     </Suspense>
                   ) : null
@@ -4336,6 +4582,7 @@ export default function App() {
                     dockPosition={consoleDock}
                     onToggleDockPosition={handleToggleConsoleDock}
                     requestedTab={requestedConsoleTab}
+                    onAskAiError={aiSettings.showDockButton ? handleAskAiAboutError : undefined}
                   />
                 )}
               </div>
@@ -4620,6 +4867,8 @@ export default function App() {
             offlineCppPercent={offlineCppPercent}
             visualPrefs={visualPrefs}
             onUpdateVisualPrefs={handleUpdateVisualPrefs}
+            aiSettings={aiSettings}
+            onUpdateAiSettings={handleUpdateAiSettings}
           />
         </Suspense>
       )}

@@ -13,6 +13,15 @@ export default {
           '"Plus Jakarta Sans"',
           'system-ui',
           'sans-serif'
+        ],
+        mono: [
+          '"JetBrains Mono"',
+          '"SF Mono"',
+          '"Fira Code"',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'monospace'
         ]
       }
     }

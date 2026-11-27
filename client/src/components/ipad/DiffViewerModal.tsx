@@ -9,6 +9,7 @@ import {
   Camera
 } from 'lucide-react';
 import { SupportedLanguage, WorkspaceFile } from '../../types/ide';
+import { CustomSelect } from '../CustomSelect';
 
 interface DiffViewerModalProps {
   open: boolean;
@@ -229,21 +230,20 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
 
           {/* File Pickers */}
           <div className="flex items-center gap-2 flex-1 justify-center min-w-[260px]">
-            <select
+            <CustomSelect
               value={leftSource}
-              onChange={(e) => setLeftSource(e.target.value)}
-              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-              className="h-8 px-2.5 rounded-xl text-xs font-medium outline-none max-w-[210px] truncate"
-            >
-              <option value="__snapshot__">
-                Bản gốc đã chụp ({rightFile?.name || 'file'})
-              </option>
-              {editableFiles.map((f) => (
-                <option key={f.path} value={f.path}>
-                  {f.path}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setLeftSource(val)}
+              align="left"
+              maxMenuWidth={280}
+              className="max-w-[210px]"
+              options={[
+                {
+                  value: '__snapshot__',
+                  label: `Bản gốc đã chụp (${rightFile?.name || 'file'})`
+                },
+                ...editableFiles.map((f) => ({ value: f.path, label: f.path }))
+              ]}
+            />
 
             <button
               type="button"
@@ -255,24 +255,20 @@ export const DiffViewerModal: React.FC<DiffViewerModalProps> = ({
                 }
               }}
               disabled={leftSource === '__snapshot__'}
-              className="w-8 h-8 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-35 flex items-center justify-center shrink-0"
+              className="w-8 h-8 rounded-xl bg-[var(--bg-panel-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-35 flex items-center justify-center shrink-0 transition-colors"
               title="Đổi chỗ Trái ↔ Phải"
             >
               <ArrowLeftRight size={13} />
             </button>
 
-            <select
+            <CustomSelect
               value={rightFile?.path || ''}
-              onChange={(e) => setRightPath(e.target.value)}
-              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-              className="h-8 px-2.5 rounded-xl text-xs font-medium outline-none max-w-[210px] truncate"
-            >
-              {editableFiles.map((f) => (
-                <option key={f.path} value={f.path}>
-                  {f.path}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setRightPath(val)}
+              align="left"
+              maxMenuWidth={280}
+              className="max-w-[210px]"
+              options={editableFiles.map((f) => ({ value: f.path, label: f.path }))}
+            />
           </div>
 
           {/* Right controls */}

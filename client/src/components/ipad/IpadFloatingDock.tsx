@@ -4,18 +4,20 @@ import {
   PanelBottom,
   PenTool,
   FileText,
+  Sparkles,
   Move,
   Command,
   Keyboard,
   KeyboardOff
 } from 'lucide-react';
 
-export type IpadRightTool = 'scratchpad' | 'notes' | null;
+export type IpadRightTool = 'scratchpad' | 'notes' | 'ai' | null;
 
 interface IpadFloatingDockProps {
   consoleDock: 'bottom' | 'right';
   bottomOpen: boolean;
   rightTool: IpadRightTool;
+  showAiTool?: boolean;
   trackpadOpen: boolean;
   hardwareKeyboardMode: boolean;
   onToggleConsoleDock: () => void;
@@ -32,6 +34,7 @@ export const IpadFloatingDock: React.FC<IpadFloatingDockProps> = ({
   consoleDock,
   bottomOpen,
   rightTool,
+  showAiTool = true,
   trackpadOpen,
   hardwareKeyboardMode,
   onToggleConsoleDock,
@@ -99,6 +102,20 @@ export const IpadFloatingDock: React.FC<IpadFloatingDockProps> = ({
         >
           <FileText size={16} strokeWidth={rightTool === 'notes' ? 2 : 1.75} />
         </RailBtn>
+
+        {showAiTool && (
+          <RailBtn
+            active={rightTool === 'ai'}
+            title="Trợ lý AI Gemini 4 (⌘⇧I)"
+            onClick={() => onToggleRightTool('ai')}
+          >
+            <Sparkles
+              size={16}
+              strokeWidth={rightTool === 'ai' ? 2.1 : 1.8}
+              style={{ color: rightTool === 'ai' ? '#C084FC' : undefined }}
+            />
+          </RailBtn>
+        )}
 
         <RailBtn
           active={bottomOpen && consoleDock === 'right' && rightTool === null}

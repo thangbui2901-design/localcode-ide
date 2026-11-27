@@ -40,8 +40,8 @@ export const UI_THEMES: ThemeDefinition[] = [
     name: 'Midnight Navy',
     shortName: 'Midnight',
     mode: 'dark',
-    canvasBg: '#080C18',
-    bgSwatch: '#0D1326',
+    canvasBg: '#060913',
+    bgSwatch: '#0F1629',
     accentSwatch: '#3B82F6',
     monacoTheme: 'vs-dark-modern',
     syntax: {
@@ -154,18 +154,18 @@ export const UI_THEMES: ThemeDefinition[] = [
     name: 'VS Code Dark+',
     shortName: 'Dark+',
     mode: 'dark',
-    canvasBg: '#121212',
-    bgSwatch: '#1E1E1E',
+    canvasBg: '#0E0E10',
+    bgSwatch: '#1A1A1D',
     accentSwatch: '#0EA5E9',
     monacoTheme: 'vs-dark-modern',
     syntax: {
-      foreground: '#D4D4D4',
+      foreground: '#E4E4E7',
       comment: '6A9955',
       keyword: '569CD6',
       string: 'CE9178',
       number: 'B5CEA8',
       type: '4EC9B0',
-      lineNumber: '#6B6B6B'
+      lineNumber: '#6B7280'
     }
   },
   {
@@ -174,17 +174,17 @@ export const UI_THEMES: ThemeDefinition[] = [
     shortName: 'OLED Black',
     mode: 'dark',
     canvasBg: '#000000',
-    bgSwatch: '#06070A',
+    bgSwatch: '#0D0E13',
     accentSwatch: '#38BDF8',
     monacoTheme: 'vs-dark-modern',
     syntax: {
-      foreground: '#F4F4F5',
-      comment: '52525B',
+      foreground: '#F4F4F6',
+      comment: '6B7280',
       keyword: 'C084FC',
       string: '34D399',
       number: 'FB7185',
       type: '38BDF8',
-      lineNumber: '#3F3F46'
+      lineNumber: '#525866'
     }
   },
   {

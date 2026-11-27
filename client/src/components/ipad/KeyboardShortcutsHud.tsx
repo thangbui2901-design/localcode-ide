@@ -41,6 +41,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: ['⌘', '⇧', 'D'], label: 'So sánh mã nguồn (Diff View)' },
       { keys: ['⌘', '⇧', 'A'], label: 'Bảng nháp Apple Pencil' },
       { keys: ['⌘', '⇧', 'N'], label: 'Đề bài & Ghi chú song song' },
+      { keys: ['⌘', '⇧', 'I'], label: 'Trợ lý AI Gemini 4' },
       { keys: ['Esc'], label: 'Thoát chế độ Tập trung (Zen)' }
     ]
   }

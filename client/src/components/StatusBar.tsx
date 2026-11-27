@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle2, AlertTriangle, Cloud, HardDrive, Command, WifiOff, Cpu } from 'lucide-react';
 import { CompilerSettings, EditorSettings, ExecutionMode, WorkspaceFile } from '../types/ide';
+import { CustomSelect } from './CustomSelect';
 
 interface StatusBarProps {
   mode: ExecutionMode;
@@ -33,21 +34,20 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   return (
     <footer
       style={{
-        backgroundColor: 'var(--bg-panel-alt)',
-        color: 'var(--text-secondary)',
-        borderTop: '1px solid var(--border-subtle)'
+        backgroundColor: 'transparent',
+        color: 'var(--text-secondary)'
       }}
-      className="h-7 text-[11px] px-3 flex items-center justify-between select-none shrink-0"
+      className="h-6 text-[11px] px-1.5 flex items-center justify-between select-none shrink-0"
     >
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0">
         <button
           onClick={onToggleMode}
           title="Chuyển đổi chế độ thực thi"
           style={{
-            backgroundColor: 'var(--bg-elevated)',
+            backgroundColor: 'var(--bg-panel)',
             color: 'var(--text-primary)'
           }}
-          className="px-2 py-0.5 rounded-md flex items-center gap-1.5 font-medium cursor-pointer hover:opacity-90 transition-opacity"
+          className="px-2 py-0.5 rounded-lg flex items-center gap-1.5 font-medium cursor-pointer hover:bg-[var(--bg-panel-alt)] transition-colors"
         >
           {mode === 'standalone' ? (
             <Cloud size={11} className="text-sky-400" />
@@ -80,8 +80,8 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
           <button
             type="button"
             onClick={onOpenShortcutsHud}
-            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-            className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)' }}
+            className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold hover:bg-[var(--bg-panel-alt)] transition-colors"
             title="Xem bảng phím tắt Magic Keyboard (hoặc giữ phím ⌘)"
           >
             <Command size={10} style={{ color: 'var(--accent-primary)' }} />
@@ -103,13 +103,13 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
               onChangeCompiler({ ...compilerSettings, cppEngine: next });
             }}
             style={{
-              backgroundColor: 'var(--bg-elevated)',
+              backgroundColor: 'var(--bg-panel)',
               color:
                 compilerSettings.cppEngine === 'offline-wasm'
                   ? '#10B981'
                   : 'var(--text-primary)'
             }}
-            className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold hover:bg-[var(--bg-panel-alt)] transition-colors cursor-pointer"
             title="Chuyển nhanh engine biên dịch C/C++ (Tự động / Offline Clang WASM / Cloud GCC)"
           >
             {compilerSettings.cppEngine === 'offline-wasm' ? (
@@ -128,51 +128,51 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
         )}
 
         {lang === 'cpp' && (
-          <select
+          <CustomSelect<CompilerSettings['cppStandard']>
             value={compilerSettings.cppStandard}
-            onChange={(e) =>
+            onChange={(val) =>
               onChangeCompiler({
                 ...compilerSettings,
-                cppStandard: e.target.value as CompilerSettings['cppStandard']
+                cppStandard: val
               })
             }
-            style={{
-              backgroundColor: 'var(--bg-elevated)',
-              color: 'var(--text-primary)'
-            }}
-            className="px-2 py-0.5 rounded-md text-[11px] font-semibold outline-none cursor-pointer"
-          >
-            <option value="gnu++14">GNU++14</option>
-            <option value="gnu++17">GNU++17</option>
-            <option value="gnu++20">GNU++20</option>
-            <option value="gnu++23">GNU++23</option>
-          </select>
+            size="xs"
+            variant="subtle"
+            minMenuWidth={126}
+            className="font-semibold"
+            options={[
+              { value: 'gnu++14', label: 'GNU++14' },
+              { value: 'gnu++17', label: 'GNU++17' },
+              { value: 'gnu++20', label: 'GNU++20' },
+              { value: 'gnu++23', label: 'GNU++23' }
+            ]}
+          />
         )}
 
         {lang === 'c' && (
-          <select
+          <CustomSelect<CompilerSettings['cStandard']>
             value={compilerSettings.cStandard}
-            onChange={(e) =>
+            onChange={(val) =>
               onChangeCompiler({
                 ...compilerSettings,
-                cStandard: e.target.value as CompilerSettings['cStandard']
+                cStandard: val
               })
             }
-            style={{
-              backgroundColor: 'var(--bg-elevated)',
-              color: 'var(--text-primary)'
-            }}
-            className="px-2 py-0.5 rounded-md text-[11px] font-semibold outline-none cursor-pointer"
-          >
-            <option value="c11">GCC C11</option>
-            <option value="c17">GCC C17</option>
-          </select>
+            size="xs"
+            variant="subtle"
+            minMenuWidth={118}
+            className="font-semibold"
+            options={[
+              { value: 'c11', label: 'GCC C11' },
+              { value: 'c17', label: 'GCC C17' }
+            ]}
+          />
         )}
 
         {lang === 'python' && (
           <span
-            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-            className="px-2 py-0.5 rounded-md font-semibold"
+            style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)' }}
+            className="px-2 py-0.5 rounded-lg font-semibold"
           >
             Python 3
           </span>

@@ -15,6 +15,14 @@ import {
 } from 'lucide-react';
 import { EditorSettings, SupportedLanguage, WorkspaceFile } from '../types/ide';
 
+export interface EditorCodeSelection {
+  filePath: string;
+  fileName: string;
+  text: string;
+  startLine: number;
+  endLine: number;
+}
+
 interface CodeEditorProps {
   file: WorkspaceFile | null;
   settings: EditorSettings;
@@ -26,6 +34,7 @@ interface CodeEditorProps {
   onRun: () => void;
   onFocusEditor?: () => void;
   onCursorChange?: (line: number, column: number) => void;
+  onSelectionChange?: (selection: EditorCodeSelection | null) => void;
   onChangeFontSize?: (nextSize: number) => void;
   onQuickCreateTemplate?: (fileName: string, content: string) => void;
   onQuickCreateWebProject?: () => void;
@@ -146,6 +155,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onRun,
   onFocusEditor,
   onCursorChange,
+  onSelectionChange,
   onChangeFontSize,
   onQuickCreateTemplate,
   onQuickCreateWebProject
@@ -243,6 +253,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const onCursorRef = useRef(onCursorChange);
   onCursorRef.current = onCursorChange;
 
+  const onSelectionRef = useRef(onSelectionChange);
+  onSelectionRef.current = onSelectionChange;
+
+  const fileMetaRef = useRef<{ path: string; name: string } | null>(null);
+  fileMetaRef.current = file ? { path: file.path, name: file.name } : null;
+
   const typingSoundRef = useRef(typingSound);
   typingSoundRef.current = typingSound;
 
@@ -259,11 +275,23 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       language: mapToMonacoLanguage(file.language),
       theme: settings.theme || 'vs-dark-modern',
       fontSize: settings.fontSize,
+      lineHeight: Math.round(settings.fontSize * 1.62),
+      letterSpacing: 0.15,
       fontFamily: settings.fontFamily,
+      fontLigatures: true,
       tabSize: settings.tabSize,
       wordWrap: settings.wordWrap,
       minimap: { enabled: breakpoint === 'desktop' && settings.minimap },
       lineNumbers: settings.lineNumbers,
+      lineNumbersMinChars: 3,
+      glyphMargin: false,
+      roundedSelection: true,
+      renderLineHighlight: 'all',
+      guides: {
+        indentation: true,
+        highlightActiveIndentation: true,
+        bracketPairs: false
+      },
       automaticLayout: true,
       fixedOverflowWidgets: true,
       scrollBeyondLastLine: false,
@@ -281,7 +309,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       },
       cursorBlinking: 'smooth',
       cursorSmoothCaretAnimation: 'on',
-      padding: { top: 12, bottom: 16 },
+      padding: { top: 14, bottom: 20 },
       quickSuggestions: settings.quickSuggestions
         ? { other: 'on', comments: 'off', strings: 'on' }
         : false,
@@ -391,13 +419,52 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       onCursorRef.current?.(e.position.lineNumber, e.position.column);
     });
 
+    let selectionTimer: number | null = null;
+    let lastSelectionKey = '';
+    const selectionSub = editor.onDidChangeCursorSelection((e) => {
+      if (!onSelectionRef.current) return;
+      const sel = e.selection;
+      const isEmpty = sel.isEmpty();
+      const key = isEmpty
+        ? ''
+        : `${sel.startLineNumber}:${sel.startColumn}-${sel.endLineNumber}:${sel.endColumn}`;
+      if (key === lastSelectionKey) return;
+      lastSelectionKey = key;
+
+      if (selectionTimer) window.clearTimeout(selectionTimer);
+      selectionTimer = window.setTimeout(() => {
+        const cb = onSelectionRef.current;
+        if (!cb) return;
+        const model = editor.getModel();
+        const meta = fileMetaRef.current;
+        if (isEmpty || !model || !meta) {
+          cb(null);
+          return;
+        }
+        const selectedText = model.getValueInRange(sel);
+        if (!selectedText.trim()) {
+          cb(null);
+          return;
+        }
+        cb({
+          filePath: meta.path,
+          fileName: meta.name,
+          text: selectedText.slice(0, 8000),
+          startLine: sel.startLineNumber,
+          endLine: sel.endLineNumber
+        });
+      }, 120);
+    });
+
     const focusSub = editor.onDidFocusEditorWidget(() => {
       onFocusRef.current?.();
     });
 
     return () => {
+      if (selectionTimer) window.clearTimeout(selectionTimer);
       changeSub.dispose();
       cursorSub.dispose();
+      selectionSub.dispose();
       focusSub.dispose();
       editor.dispose();
       instanceRef.current = null;
@@ -431,7 +498,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
     editor.updateOptions({
       fontSize: settings.fontSize,
+      lineHeight: Math.round(settings.fontSize * 1.62),
       fontFamily: settings.fontFamily,
+      fontLigatures: true,
       tabSize: settings.tabSize,
       wordWrap: settings.wordWrap,
       minimap: { enabled: breakpoint === 'desktop' && settings.minimap },

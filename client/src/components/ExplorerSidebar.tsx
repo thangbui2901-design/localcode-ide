@@ -310,24 +310,19 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
     return (
       <div
         key={node.path}
+        aria-selected={isSelected}
         onClick={() => {
           if (!isBeingRenamed && fileObj) onSelectFile(fileObj);
         }}
         style={{
-          paddingLeft: `${depth * 14 + 22}px`,
-          backgroundColor: isSelected
-            ? 'color-mix(in srgb, var(--text-primary) 9%, transparent)'
-            : undefined,
-          border: isSelected
-            ? '1px solid color-mix(in srgb, var(--text-primary) 8%, transparent)'
-            : '1px solid transparent',
-          boxShadow: isSelected ? 'inset 0 1px 0 rgba(255, 255, 255, 0.06)' : undefined,
+          paddingLeft: `${depth * 14 + 20}px`,
+          backgroundColor: isSelected ? 'var(--bg-panel-alt)' : undefined,
           color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)'
         }}
-        className={`group h-8 pr-2.5 rounded-xl flex items-center justify-between gap-1.5 cursor-pointer text-[13px] transition-all relative ${
+        className={`group h-8 pr-2.5 rounded-[10px] flex items-center justify-between gap-1.5 cursor-pointer text-[13px] transition-colors relative ${
           isSelected
-            ? 'font-medium'
-            : 'hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-primary)]'
+            ? 'font-semibold'
+            : 'hover:bg-[var(--bg-panel-alt)]/65 hover:text-[var(--text-primary)]'
         }`}
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -447,10 +442,11 @@ export const ExplorerSidebar: React.FC<ExplorerSidebarProps> = ({
             <div
               style={{
                 backgroundColor: 'var(--bg-panel)',
-                border: '1px solid var(--border-subtle)',
+                boxShadow:
+                  '0 20px 50px -12px rgba(0, 0, 0, 0.38), 0 0 0 1px color-mix(in srgb, var(--text-primary) 6%, transparent)',
                 color: 'var(--text-primary)'
               }}
-              className="absolute right-3 top-11 w-52 rounded-2xl p-1.5 shadow-2xl z-50 ios-popover-enter space-y-0.5"
+              className="absolute right-3 top-11 w-52 rounded-2xl p-1.5 z-50 ios-popover-enter space-y-0.5"
             >
               <button
                 type="button"

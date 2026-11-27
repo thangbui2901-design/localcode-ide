@@ -15,7 +15,8 @@ import {
   XCircle,
   AlertTriangle,
   PanelRight,
-  PanelBottom
+  PanelBottom,
+  Sparkles
 } from 'lucide-react';
 import { ExecutionMode, IdeDiagnostic, TestCaseItem, TestCaseResult } from '../types/ide';
 
@@ -53,6 +54,7 @@ interface BottomPanelProps {
   onToggleDockPosition?: () => void;
   requestedTab?: { tab: 'terminal' | 'input' | 'tests' | 'problems'; seq: number } | null;
   hideVirtualKeyboard?: boolean;
+  onAskAiError?: () => void;
 }
 
 export const BottomPanel: React.FC<BottomPanelProps> = ({
@@ -83,7 +85,8 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   dockPosition = 'bottom',
   onToggleDockPosition,
   requestedTab = null,
-  hideVirtualKeyboard = false
+  hideVirtualKeyboard = false,
+  onAskAiError
 }) => {
   const [activeTab, setActiveTab] = useState<'terminal' | 'input' | 'tests' | 'problems'>('terminal');
   const [stdinText, setStdinText] = useState('');
@@ -161,6 +164,11 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
     onChangeTestCases(testCases.filter((tc) => tc.id !== id));
   };
 
+  const isApplePlatform =
+    typeof navigator !== 'undefined' &&
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+  const runShortcutLabel = isApplePlatform ? '⌘Enter' : 'Ctrl+Enter';
+
   const tabBtn = (
     id: 'terminal' | 'input' | 'tests' | 'problems',
     label: string,
@@ -172,10 +180,14 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
         type="button"
         onClick={() => setActiveTab(id)}
         style={{
-          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-          borderBottomColor: active ? 'var(--accent-primary)' : 'transparent'
+          backgroundColor: active ? 'var(--bg-panel-alt)' : 'transparent',
+          color: active ? 'var(--text-primary)' : 'var(--text-secondary)'
         }}
-        className="h-9 px-1 flex items-center gap-1.5 border-b-2 text-[11px] font-semibold tracking-wide transition-colors shrink-0"
+        className={`h-7 px-2.5 rounded-[9px] flex items-center gap-1.5 text-[11.5px] transition-colors shrink-0 ${
+          active
+            ? 'font-semibold'
+            : 'font-medium hover:bg-[var(--bg-panel-alt)]/55 hover:text-[var(--text-primary)]'
+        }`}
       >
         <span>{label}</span>
         {badge}
@@ -197,15 +209,12 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
           : 'h-full min-h-0'
       }`}
     >
-      {/* Unified Sleek Header */}
+      {/* Unified Borderless Pill Header */}
       <div
-        style={{
-          backgroundColor: 'var(--bg-panel-alt)',
-          borderBottom: '1px solid var(--border-subtle)'
-        }}
-        className="h-9 px-3 flex items-center justify-between select-none shrink-0 gap-2"
+        style={{ backgroundColor: 'var(--bg-panel)' }}
+        className="h-10 px-2.5 flex items-center justify-between select-none shrink-0 gap-2"
       >
-        <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {tabBtn('terminal', 'Console')}
           {tabBtn(
             'input',
@@ -249,6 +258,25 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {onAskAiError &&
+            !isRunning &&
+            (diagnostics.some((d) => d.severity === 'error') ||
+              logs.some((l) => l.type === 'stderr' && l.text.trim().length > 0)) && (
+              <button
+                type="button"
+                onClick={onAskAiError}
+                style={{
+                  backgroundColor: 'var(--bg-active)',
+                  color: 'var(--accent-primary)'
+                }}
+                className="h-6 px-2.5 rounded-full text-[10px] font-bold flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shrink-0"
+                title="Mở Trợ lý AI Gemini để giải thích và gợi ý sửa lỗi này"
+              >
+                <Sparkles size={11} />
+                <span>Hỏi AI</span>
+              </button>
+            )}
+
           {(isRunning || isWaitingForInput || lastElapsedMs !== null) && (
             <span
               style={{
@@ -338,11 +366,8 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
       {activeTab === 'tests' && onChangeTestCases && (
         <div className="flex-1 min-h-0 flex flex-col">
           <div
-            style={{
-              backgroundColor: 'var(--bg-panel-alt)',
-              borderBottom: '1px solid var(--border-subtle)'
-            }}
-            className="px-3 py-1.5 flex items-center justify-between gap-2 text-xs shrink-0"
+            style={{ backgroundColor: 'var(--bg-panel)' }}
+            className="px-3 pb-1.5 flex items-center justify-between gap-2 text-xs shrink-0"
           >
             <div className="flex items-center gap-2 min-w-0">
               <FlaskConical size={13} className="text-sky-400 shrink-0" />
@@ -408,10 +433,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
                 return (
                   <div
                     key={tc.id}
-                    style={{
-                      backgroundColor: 'var(--bg-panel-alt)',
-                      border: '1px solid var(--border-subtle)'
-                    }}
+                    style={{ backgroundColor: 'var(--bg-panel-alt)' }}
                     className="rounded-xl p-2.5 space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -483,8 +505,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
                           placeholder="VD: 5&#10;3 1 4 1 5"
                           style={{
                             backgroundColor: 'var(--bg-panel)',
-                            color: 'var(--text-primary)',
-                            border: '1px solid var(--border-subtle)'
+                            color: 'var(--text-primary)'
                           }}
                           className="w-full p-2 rounded-lg font-mono text-xs resize-y outline-none"
                         />
@@ -505,8 +526,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
                           placeholder="VD: 1 1 3 4 5"
                           style={{
                             backgroundColor: 'var(--bg-panel)',
-                            color: 'var(--text-primary)',
-                            border: '1px solid var(--border-subtle)'
+                            color: 'var(--text-primary)'
                           }}
                           className="w-full p-2 rounded-lg font-mono text-xs resize-y outline-none"
                         />
@@ -515,10 +535,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
 
                     {res && res.status !== 'idle' && res.status !== 'running' && (
                       <div
-                        style={{
-                          backgroundColor: 'var(--bg-panel)',
-                          border: '1px solid var(--border-subtle)'
-                        }}
+                        style={{ backgroundColor: 'var(--bg-panel)' }}
                         className="rounded-lg p-2 text-xs font-mono space-y-1"
                       >
                         <div className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
@@ -546,11 +563,8 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
       {activeTab === 'input' && (
         <div className="flex-1 min-h-0 flex flex-col">
           <div
-            style={{
-              backgroundColor: 'var(--bg-panel-alt)',
-              borderBottom: '1px solid var(--border-subtle)'
-            }}
-            className="px-3 py-1.5 flex items-center justify-between gap-2 text-xs shrink-0"
+            style={{ backgroundColor: 'var(--bg-panel)' }}
+            className="px-3 pb-1.5 flex items-center justify-between gap-2 text-xs shrink-0"
           >
             <label
               className="flex items-center gap-2 cursor-pointer select-none"
@@ -597,7 +611,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
               backgroundColor: 'var(--bg-panel)',
               color: 'var(--text-primary)'
             }}
-            className="flex-1 w-full p-3 font-mono text-[13px] leading-relaxed resize-none outline-none"
+            className="flex-1 w-full p-3 font-mono text-[13px] leading-relaxed resize-none outline-none placeholder:font-sans placeholder:opacity-55"
           />
         </div>
       )}
@@ -639,14 +653,43 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
                 stdinInputRef.current?.focus();
               }
             }}
-            className="flex-1 overflow-y-auto p-3 font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words select-text cursor-text"
+            className="flex-1 overflow-y-auto px-3.5 py-2 font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words select-text cursor-text"
           >
             {logs.length === 0 ? (
-              <span style={{ color: 'var(--text-secondary)' }} className="opacity-70">
-                {hasPresetInput
-                  ? 'Đã có sẵn dữ liệu trong tab Input. Bấm Run (⌘Enter) để chạy...'
-                  : 'Bấm nút Run (⌘Enter) để biên dịch và xem kết quả tại đây...'}
-              </span>
+              <div
+                style={{ color: 'var(--text-secondary)' }}
+                className="font-sans text-[12.5px] leading-relaxed opacity-75 flex flex-wrap items-center gap-1.5"
+              >
+                {hasPresetInput ? (
+                  <>
+                    <span>Đã có sẵn dữ liệu trong tab Input. Bấm Run</span>
+                    <kbd
+                      style={{
+                        backgroundColor: 'var(--bg-panel-alt)',
+                        color: 'var(--text-primary)'
+                      }}
+                      className="px-1.5 py-0.5 rounded-md font-mono text-[11px] font-medium"
+                    >
+                      {runShortcutLabel}
+                    </kbd>
+                    <span>để chạy...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Bấm nút Run</span>
+                    <kbd
+                      style={{
+                        backgroundColor: 'var(--bg-panel-alt)',
+                        color: 'var(--text-primary)'
+                      }}
+                      className="px-1.5 py-0.5 rounded-md font-mono text-[11px] font-medium"
+                    >
+                      {runShortcutLabel}
+                    </kbd>
+                    <span>để biên dịch và xem kết quả tại đây...</span>
+                  </>
+                )}
+              </div>
             ) : (
               <>
                 {logs.map((chunk, i) => (
@@ -679,60 +722,71 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
             )}
           </div>
 
-          <form
-            onSubmit={submitStdin}
-            style={{
-              backgroundColor: 'var(--bg-panel-alt)',
-              borderTop: isWaitingForInput
-                ? '1.5px solid rgba(16, 185, 129, 0.55)'
-                : '1px solid var(--border-subtle)'
-            }}
-            className="h-10 px-3 flex items-center gap-2 shrink-0 transition-colors"
-          >
-            <span
-              className={`text-xs font-mono font-semibold shrink-0 ${
-                isWaitingForInput ? 'text-emerald-400 animate-pulse' : 'text-emerald-400'
-              }`}
+          <div className="px-2.5 pb-2.5 pt-1 shrink-0">
+            <form
+              onSubmit={submitStdin}
+              style={{
+                backgroundColor: 'var(--bg-panel-alt)',
+                boxShadow: isWaitingForInput
+                  ? '0 0 0 1.5px rgba(16, 185, 129, 0.5)'
+                  : undefined
+              }}
+              className="h-9 pl-3 pr-1.5 rounded-[10px] flex items-center gap-2 transition-all"
             >
-              {isWaitingForInput ? 'nhập >' : 'stdin >'}
-            </span>
-            <input
-              ref={stdinInputRef}
-              value={stdinText}
-              onChange={(e) => setStdinText(e.target.value)}
-              inputMode={hideVirtualKeyboard ? 'none' : undefined}
-              disabled={isRunning && mode === 'standalone'}
-              placeholder={
-                isWaitingForInput
-                  ? 'Gõ giá trị rồi nhấn Enter để chạy tiếp...'
-                  : mode === 'standalone'
-                    ? 'Bấm Run để nhập từng dòng, hoặc gõ sẵn vào Input...'
-                    : isRunning
-                      ? 'Nhập dữ liệu rồi nhấn Enter...'
-                      : 'Nhập stdin hoặc mở tab Input / Tests...'
-              }
-              style={{ color: 'var(--text-primary)' }}
-              className="flex-1 bg-transparent text-xs font-mono outline-none placeholder:opacity-60 disabled:opacity-50"
-            />
-            {((isRunning && mode === 'local') || isWaitingForInput) && (
-              <button
-                type="button"
-                onClick={onSendEof}
-                title="Gửi tín hiệu kết thúc nhập (EOF / Ctrl+D)"
-                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-                className="h-7 px-2 rounded-lg text-[11px] font-mono shrink-0 hover:bg-[var(--bg-hover)]"
+              <span
+                className={`text-[11.5px] font-mono font-semibold shrink-0 ${
+                  isWaitingForInput ? 'text-emerald-400 animate-pulse' : 'text-emerald-500/85'
+                }`}
               >
-                EOF
+                {isWaitingForInput ? 'nhập >' : 'stdin >'}
+              </span>
+              <input
+                ref={stdinInputRef}
+                value={stdinText}
+                onChange={(e) => setStdinText(e.target.value)}
+                inputMode={hideVirtualKeyboard ? 'none' : undefined}
+                disabled={isRunning && mode === 'standalone'}
+                placeholder={
+                  isWaitingForInput
+                    ? 'Gõ giá trị rồi nhấn Enter để chạy tiếp...'
+                    : mode === 'standalone'
+                      ? 'Bấm Run để nhập từng dòng, hoặc gõ sẵn vào Input...'
+                      : isRunning
+                        ? 'Nhập dữ liệu rồi nhấn Enter...'
+                        : 'Nhập stdin hoặc mở tab Input / Tests...'
+                }
+                style={{ color: 'var(--text-primary)' }}
+                className="flex-1 bg-transparent text-[12.5px] font-mono outline-none placeholder:font-sans placeholder:opacity-55 disabled:opacity-50"
+              />
+              {((isRunning && mode === 'local') || isWaitingForInput) && (
+                <button
+                  type="button"
+                  onClick={onSendEof}
+                  title="Gửi tín hiệu kết thúc nhập (EOF / Ctrl+D)"
+                  style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                  className="h-6 px-2 rounded-md text-[10.5px] font-mono shrink-0 hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  EOF
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={isRunning && mode === 'standalone'}
+                style={{
+                  backgroundColor:
+                    stdinText.trim() || isWaitingForInput
+                      ? 'var(--accent-primary)'
+                      : 'var(--bg-elevated)',
+                  color:
+                    stdinText.trim() || isWaitingForInput ? '#FFFFFF' : 'var(--text-secondary)'
+                }}
+                className="w-7 h-6 rounded-md flex items-center justify-center shrink-0 hover:brightness-110 active:scale-95 transition-all disabled:opacity-45"
+                title="Gửi dữ liệu (Enter)"
+              >
+                <Send size={11.5} />
               </button>
-            )}
-            <button
-              type="submit"
-              disabled={isRunning && mode === 'standalone'}
-              className="w-8 h-7 rounded-lg accent-btn flex items-center justify-center shrink-0 btn-lift disabled:opacity-45"
-            >
-              <Send size={12} />
-            </button>
-          </form>
+            </form>
+          </div>
         </>
       )}
     </div>

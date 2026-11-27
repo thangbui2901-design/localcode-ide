@@ -54,24 +54,25 @@ export const MobileNav: React.FC<MobileNavProps> = React.memo(({
 
   return (
     <nav
+      aria-label="Điều hướng"
       style={{
-        paddingBottom: 'max(10px, calc(env(safe-area-inset-bottom) - 10px))',
+        paddingBottom: 'max(14px, calc(env(safe-area-inset-bottom) - 6px))',
         paddingLeft: 'max(14px, env(safe-area-inset-left))',
         paddingRight: 'max(14px, env(safe-area-inset-right))'
       }}
       className="fixed inset-x-0 bottom-0 select-none pt-1 z-30 pointer-events-none"
     >
-      <div
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--bg-panel) 84%, transparent)',
-          border: '1px solid var(--border-subtle)',
-          boxShadow:
-            '0 14px 36px -8px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.14)'
-        }}
-        className="pointer-events-auto relative max-w-md mx-auto rounded-full p-1.5 backdrop-blur-lg"
-      >
-        <div className="relative flex items-center">
-          {/* Viên thuốc trượt bo tròn mượt bên trong giống thanh bar iOS/Messenger */}
+      <div className="apple-liquid-dock pointer-events-auto relative w-fit mx-auto rounded-full p-1.5 overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-4 top-0 h-[1px] opacity-80"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--accent-primary) 45%, #ffffff) 50%, transparent 100%)'
+          }}
+        />
+        <div className="relative z-10 flex items-center">
+          {/* Giọt kính lỏng trượt mượt giữa các icon */}
           <div
             aria-hidden="true"
             style={{
@@ -81,12 +82,7 @@ export const MobileNav: React.FC<MobileNavProps> = React.memo(({
             }}
             className="absolute inset-y-0 left-0 pointer-events-none"
           >
-            <div
-              style={{
-                backgroundColor: 'color-mix(in srgb, var(--text-primary) 11%, transparent)'
-              }}
-              className="w-full h-full rounded-full"
-            />
+            <div className="apple-liquid-dock-active w-full h-full rounded-full" />
           </div>
 
           {tabs.map((tab) => {
@@ -97,6 +93,8 @@ export const MobileNav: React.FC<MobileNavProps> = React.memo(({
               <button
                 key={tab.id}
                 type="button"
+                aria-label={tab.label}
+                title={tab.label}
                 onClick={() => {
                   if (tab.id === 'home') {
                     onGoHome?.();
@@ -107,18 +105,15 @@ export const MobileNav: React.FC<MobileNavProps> = React.memo(({
                 style={{
                   color: active ? 'var(--accent-primary)' : 'var(--text-secondary)'
                 }}
-                className="relative z-10 flex-1 h-12 rounded-full flex flex-col items-center justify-center gap-0.5 transition-colors duration-200 active:scale-95"
+                className="relative z-10 w-12 h-10 rounded-full flex items-center justify-center transition-colors duration-200 active:scale-95"
               >
                 <span className={`relative ${active ? 'ios-nav-icon-active' : ''}`}>
                   {renderIcon(tab.id, active)}
                   {badge > 0 && (
-                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
                       {badge}
                     </span>
                   )}
-                </span>
-                <span className={`text-[10px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
-                  {tab.label}
                 </span>
               </button>
             );

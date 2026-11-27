@@ -12,6 +12,7 @@ import {
   Download
 } from 'lucide-react';
 import { WorkspaceFile } from '../types/ide';
+import { CustomSelect } from './CustomSelect';
 
 export type PreviewViewport = 'desktop' | 'tablet' | 'mobile';
 
@@ -727,21 +728,18 @@ export const WebPreviewPane: React.FC<WebPreviewPaneProps> = ({
           </span>
 
           {htmlFiles.length > 1 ? (
-            <select
+            <CustomSelect
               value={targetHtmlFile?.path || ''}
-              onChange={(e) => {
-                setNavigatedPath(e.target.value);
-                onSelectHtmlPath(e.target.value);
+              onChange={(val) => {
+                setNavigatedPath(val);
+                onSelectHtmlPath(val);
               }}
-              style={{ color: 'var(--text-primary)' }}
-              className="bg-transparent font-mono font-semibold outline-none cursor-pointer truncate"
-            >
-              {htmlFiles.map((f) => (
-                <option key={f.path} value={f.path}>
-                  {f.path}
-                </option>
-              ))}
-            </select>
+              size="xs"
+              variant="ghost"
+              align="left"
+              className="font-mono font-semibold"
+              options={htmlFiles.map((f) => ({ value: f.path, label: f.path }))}
+            />
           ) : (
             <span style={{ color: 'var(--text-primary)' }} className="font-mono font-semibold truncate">
               {targetHtmlFile?.path || 'preview.html'}

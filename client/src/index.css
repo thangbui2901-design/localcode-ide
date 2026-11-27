@@ -8,206 +8,206 @@
 
 :root,
 [data-ui-theme='midnight-indigo'] {
-  --bg-canvas: #080c18;
-  --bg-panel: #0e1426;
-  --bg-panel-alt: #131b31;
-  --bg-elevated: #1a2442;
-  --bg-hover: #233058;
-  --bg-active: rgba(59, 130, 246, 0.18);
-  --border-subtle: rgba(148, 163, 184, 0.14);
+  --bg-canvas: #060913;
+  --bg-panel: #0f1629;
+  --bg-panel-alt: #162038;
+  --bg-elevated: #1e2b4a;
+  --bg-hover: #26365c;
+  --bg-active: rgba(59, 130, 246, 0.16);
+  --border-subtle: rgba(148, 163, 184, 0.08);
   --text-primary: #f1f5f9;
   --text-secondary: #8b9bb8;
   --accent-primary: #3b82f6;
   --accent-secondary: #38bdf8;
-  --accent-glow: rgba(59, 130, 246, 0.36);
-  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.65);
-  --editor-bg: #0d1326;
+  --accent-glow: rgba(59, 130, 246, 0.34);
+  --shadow-card: 0 8px 26px -14px rgba(0, 0, 0, 0.65);
+  --editor-bg: #0f1629;
 }
 
 [data-ui-theme='tokyo-night'] {
-  --bg-canvas: #13141e;
+  --bg-canvas: #10111a;
   --bg-panel: #1a1b26;
-  --bg-panel-alt: #1f2335;
-  --bg-elevated: #24283b;
-  --bg-hover: #2f3549;
-  --bg-active: rgba(122, 162, 247, 0.2);
-  --border-subtle: rgba(122, 162, 247, 0.14);
+  --bg-panel-alt: #222536;
+  --bg-elevated: #2a2e44;
+  --bg-hover: #333852;
+  --bg-active: rgba(122, 162, 247, 0.18);
+  --border-subtle: rgba(122, 162, 247, 0.08);
   --text-primary: #c0caf5;
   --text-secondary: #7982a9;
   --accent-primary: #7aa2f7;
   --accent-secondary: #7dcfff;
-  --accent-glow: rgba(122, 162, 247, 0.36);
-  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.72);
+  --accent-glow: rgba(122, 162, 247, 0.34);
+  --shadow-card: 0 8px 26px -14px rgba(0, 0, 0, 0.68);
   --editor-bg: #1a1b26;
 }
 
 [data-ui-theme='catppuccin-mocha'] {
-  --bg-canvas: #161622;
+  --bg-canvas: #11111b;
   --bg-panel: #1e1e2e;
-  --bg-panel-alt: #242437;
+  --bg-panel-alt: #26263a;
   --bg-elevated: #313244;
   --bg-hover: #3b3d54;
-  --bg-active: rgba(203, 166, 247, 0.2);
-  --border-subtle: rgba(203, 166, 247, 0.13);
+  --bg-active: rgba(203, 166, 247, 0.18);
+  --border-subtle: rgba(203, 166, 247, 0.08);
   --text-primary: #cdd6f4;
   --text-secondary: #9399b2;
   --accent-primary: #cba6f7;
   --accent-secondary: #f5c2e7;
-  --accent-glow: rgba(203, 166, 247, 0.36);
-  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.68);
+  --accent-glow: rgba(203, 166, 247, 0.34);
+  --shadow-card: 0 8px 26px -14px rgba(0, 0, 0, 0.65);
   --editor-bg: #1e1e2e;
 }
 
 [data-ui-theme='nord-frost'] {
-  --bg-canvas: #232832;
+  --bg-canvas: #20252f;
   --bg-panel: #2e3440;
-  --bg-panel-alt: #353c4a;
-  --bg-elevated: #3b4252;
-  --bg-hover: #434c5e;
-  --bg-active: rgba(136, 192, 208, 0.2);
-  --border-subtle: rgba(216, 222, 233, 0.11);
+  --bg-panel-alt: #363d4c;
+  --bg-elevated: #3e4657;
+  --bg-hover: #465064;
+  --bg-active: rgba(136, 192, 208, 0.18);
+  --border-subtle: rgba(216, 222, 233, 0.07);
   --text-primary: #eceff4;
   --text-secondary: #a5b1c2;
   --accent-primary: #88c0d0;
   --accent-secondary: #81a1c1;
-  --accent-glow: rgba(136, 192, 208, 0.34);
-  --shadow-card: 0 10px 28px -14px rgba(10, 14, 22, 0.62);
+  --accent-glow: rgba(136, 192, 208, 0.32);
+  --shadow-card: 0 8px 24px -14px rgba(10, 14, 22, 0.58);
   --editor-bg: #2e3440;
 }
 
 [data-ui-theme='cyber-emerald'] {
-  --bg-canvas: #060d0b;
-  --bg-panel: #0c1714;
-  --bg-panel-alt: #11211d;
-  --bg-elevated: #172b26;
-  --bg-hover: #1f3b33;
-  --bg-active: rgba(16, 185, 129, 0.2);
-  --border-subtle: rgba(52, 211, 153, 0.14);
+  --bg-canvas: #040a08;
+  --bg-panel: #0d1815;
+  --bg-panel-alt: #13241f;
+  --bg-elevated: #1a3029;
+  --bg-hover: #223f36;
+  --bg-active: rgba(16, 185, 129, 0.18);
+  --border-subtle: rgba(52, 211, 153, 0.08);
   --text-primary: #e6f7f1;
   --text-secondary: #84a89c;
   --accent-primary: #10b981;
   --accent-secondary: #34d399;
-  --accent-glow: rgba(16, 185, 129, 0.36);
-  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
-  --editor-bg: #0c1714;
+  --accent-glow: rgba(16, 185, 129, 0.34);
+  --shadow-card: 0 8px 26px -14px rgba(0, 0, 0, 0.68);
+  --editor-bg: #0d1815;
 }
 
 [data-ui-theme='dracula-neon'] {
-  --bg-canvas: #13141b;
+  --bg-canvas: #101118;
   --bg-panel: #1b1c26;
-  --bg-panel-alt: #222430;
-  --bg-elevated: #2a2c3b;
-  --bg-hover: #35384b;
-  --bg-active: rgba(189, 147, 249, 0.22);
-  --border-subtle: rgba(189, 147, 249, 0.14);
+  --bg-panel-alt: #232533;
+  --bg-elevated: #2c2f40;
+  --bg-hover: #36394e;
+  --bg-active: rgba(189, 147, 249, 0.18);
+  --border-subtle: rgba(189, 147, 249, 0.08);
   --text-primary: #f8f8f2;
   --text-secondary: #9ea4c4;
   --accent-primary: #bd93f9;
   --accent-secondary: #ff79c6;
-  --accent-glow: rgba(189, 147, 249, 0.36);
-  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.65);
+  --accent-glow: rgba(189, 147, 249, 0.34);
+  --shadow-card: 0 8px 26px -14px rgba(0, 0, 0, 0.64);
   --editor-bg: #1b1c26;
 }
 
 [data-ui-theme='vscode-dark'] {
-  --bg-canvas: #121212;
-  --bg-panel: #1e1e1e;
-  --bg-panel-alt: #252526;
-  --bg-elevated: #2d2d30;
-  --bg-hover: #37373d;
-  --bg-active: rgba(14, 165, 233, 0.22);
-  --border-subtle: rgba(255, 255, 255, 0.08);
+  --bg-canvas: #0e0e10;
+  --bg-panel: #1a1a1d;
+  --bg-panel-alt: #232327;
+  --bg-elevated: #2c2c31;
+  --bg-hover: #36363c;
+  --bg-active: rgba(14, 165, 233, 0.18);
+  --border-subtle: rgba(255, 255, 255, 0.06);
   --text-primary: #e4e4e7;
   --text-secondary: #9ca3af;
   --accent-primary: #0ea5e9;
   --accent-secondary: #38bdf8;
-  --accent-glow: rgba(14, 165, 233, 0.34);
-  --shadow-card: 0 10px 28px -14px rgba(0, 0, 0, 0.6);
-  --editor-bg: #1e1e1e;
+  --accent-glow: rgba(14, 165, 233, 0.32);
+  --shadow-card: 0 8px 24px -14px rgba(0, 0, 0, 0.58);
+  --editor-bg: #1a1a1d;
 }
 
 [data-ui-theme='oled-obsidian'] {
   --bg-canvas: #000000;
-  --bg-panel: #07080c;
-  --bg-panel-alt: #0d0f15;
-  --bg-elevated: #151822;
-  --bg-hover: #1e2230;
-  --bg-active: rgba(56, 189, 248, 0.18);
-  --border-subtle: rgba(255, 255, 255, 0.1);
-  --text-primary: #f4f4f5;
-  --text-secondary: #8a8f9e;
+  --bg-panel: #0d0e13;
+  --bg-panel-alt: #151720;
+  --bg-elevated: #1e212e;
+  --bg-hover: #272b3b;
+  --bg-active: rgba(56, 189, 248, 0.16);
+  --border-subtle: rgba(255, 255, 255, 0.055);
+  --text-primary: #f4f4f6;
+  --text-secondary: #8a90a2;
   --accent-primary: #38bdf8;
   --accent-secondary: #818cf8;
-  --accent-glow: rgba(56, 189, 248, 0.36);
-  --shadow-card: 0 10px 30px -14px rgba(0, 0, 0, 0.9);
-  --editor-bg: #06070a;
+  --accent-glow: rgba(56, 189, 248, 0.34);
+  --shadow-card: 0 10px 28px -16px rgba(0, 0, 0, 0.92);
+  --editor-bg: #0d0e13;
 }
 
 [data-ui-theme='lavender-light'] {
-  --bg-canvas: #eef1f8;
+  --bg-canvas: #eceff7;
   --bg-panel: #ffffff;
-  --bg-panel-alt: #f5f7fc;
-  --bg-elevated: #e8edf7;
+  --bg-panel-alt: #f3f6fc;
+  --bg-elevated: #e7ecf7;
   --bg-hover: #dce3f2;
-  --bg-active: rgba(59, 130, 246, 0.14);
-  --border-subtle: rgba(15, 23, 42, 0.09);
+  --bg-active: rgba(59, 130, 246, 0.13);
+  --border-subtle: rgba(15, 23, 42, 0.065);
   --text-primary: #0f172a;
   --text-secondary: #5c6b88;
   --accent-primary: #2563eb;
   --accent-secondary: #3b82f6;
-  --accent-glow: rgba(37, 99, 235, 0.24);
-  --shadow-card: 0 10px 28px -14px rgba(15, 23, 42, 0.12);
+  --accent-glow: rgba(37, 99, 235, 0.22);
+  --shadow-card: 0 8px 24px -14px rgba(15, 23, 42, 0.1);
   --editor-bg: #ffffff;
 }
 
 [data-ui-theme='github-light'] {
-  --bg-canvas: #f3f5f8;
+  --bg-canvas: #eef1f5;
   --bg-panel: #ffffff;
-  --bg-panel-alt: #f6f8fa;
-  --bg-elevated: #eaeef2;
+  --bg-panel-alt: #f4f6f9;
+  --bg-elevated: #e8ecf1;
   --bg-hover: #dde3ea;
-  --bg-active: rgba(9, 105, 218, 0.13);
-  --border-subtle: rgba(31, 35, 40, 0.11);
+  --bg-active: rgba(9, 105, 218, 0.12);
+  --border-subtle: rgba(31, 35, 40, 0.07);
   --text-primary: #1f2328;
   --text-secondary: #656d76;
   --accent-primary: #0969da;
   --accent-secondary: #218bff;
-  --accent-glow: rgba(9, 105, 218, 0.24);
-  --shadow-card: 0 10px 26px -14px rgba(31, 35, 40, 0.12);
+  --accent-glow: rgba(9, 105, 218, 0.22);
+  --shadow-card: 0 8px 22px -14px rgba(31, 35, 40, 0.1);
   --editor-bg: #ffffff;
 }
 
 [data-ui-theme='rose-pine-dawn'] {
-  --bg-canvas: #f2e9e1;
+  --bg-canvas: #efe6de;
   --bg-panel: #faf4ed;
-  --bg-panel-alt: #f4ede8;
-  --bg-elevated: #ebe2da;
+  --bg-panel-alt: #f2eae2;
+  --bg-elevated: #e8ded5;
   --bg-hover: #dfd4cb;
-  --bg-active: rgba(215, 130, 126, 0.18);
-  --border-subtle: rgba(87, 82, 121, 0.12);
+  --bg-active: rgba(215, 130, 126, 0.16);
+  --border-subtle: rgba(87, 82, 121, 0.08);
   --text-primary: #575279;
   --text-secondary: #797593;
   --accent-primary: #d7827e;
   --accent-secondary: #907aa9;
-  --accent-glow: rgba(215, 130, 126, 0.28);
-  --shadow-card: 0 10px 26px -14px rgba(87, 82, 121, 0.14);
+  --accent-glow: rgba(215, 130, 126, 0.25);
+  --shadow-card: 0 8px 22px -14px rgba(87, 82, 121, 0.12);
   --editor-bg: #faf4ed;
 }
 
 [data-ui-theme='solarized-light'] {
-  --bg-canvas: #eee8d5;
+  --bg-canvas: #ebe4cf;
   --bg-panel: #fdf6e3;
-  --bg-panel-alt: #f4edd6;
-  --bg-elevated: #eae1c5;
+  --bg-panel-alt: #f3ecd4;
+  --bg-elevated: #e8dfc2;
   --bg-hover: #dfd5b6;
-  --bg-active: rgba(217, 119, 6, 0.16);
-  --border-subtle: rgba(88, 74, 38, 0.14);
+  --bg-active: rgba(217, 119, 6, 0.15);
+  --border-subtle: rgba(88, 74, 38, 0.08);
   --text-primary: #2c3539;
   --text-secondary: #657b83;
   --accent-primary: #d97706;
   --accent-secondary: #f59e0b;
-  --accent-glow: rgba(217, 119, 6, 0.26);
-  --shadow-card: 0 10px 26px -14px rgba(88, 74, 38, 0.14);
+  --accent-glow: rgba(217, 119, 6, 0.24);
+  --shadow-card: 0 8px 22px -14px rgba(88, 74, 38, 0.12);
   --editor-bg: #fdf6e3;
 }
 
@@ -270,14 +270,14 @@ pre {
 
 .ide-card {
   background-color: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
   transition: border-radius 0.28s var(--ease-ios-out);
 }
 
 [data-ui-density='compact'] .ide-card {
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: none;
 }
 
@@ -289,10 +289,10 @@ pre {
 }
 
 .run-btn {
-  background: linear-gradient(135deg, #10b981 0%, #2dd4bf 100%);
-  color: #052e23 !important;
+  background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+  color: #03261d !important;
   border: none !important;
-  box-shadow: 0 6px 18px -5px rgba(16, 185, 129, 0.45);
+  box-shadow: 0 4px 12px -4px rgba(16, 185, 129, 0.34);
 }
 
 .accent-pill-active {
@@ -499,189 +499,278 @@ pre {
 }
 
 /* =====================================================================
-   ANIMATED LAUNCH SPLASH SCREEN (CARTOON SPRING LOGO MOTION)
+   CARTOON ELASTIC WELCOME SCREEN + 3D WARP ZOOM INTO HOMESCREEN
    ===================================================================== */
 
-@keyframes splashSquirclePop {
+@keyframes cartoonSquircleDrop {
   0% {
     opacity: 0;
-    transform: scale(0.45) rotate(-8deg);
+    transform: translate3d(0, -48px, 0) scale(0.48, 0.62) rotate(-14deg);
   }
-  52% {
+  42% {
     opacity: 1;
-    transform: scale(1.08, 0.94) rotate(2deg);
+    transform: translate3d(0, 6px, 0) scale(1.16, 0.84) rotate(5deg);
   }
-  74% {
-    transform: scale(0.96, 1.04) rotate(-1deg);
+  64% {
+    transform: translate3d(0, -6px, 0) scale(0.92, 1.09) rotate(-3deg);
+  }
+  82% {
+    transform: translate3d(0, 2px, 0) scale(1.03, 0.97) rotate(1deg);
   }
   100% {
     opacity: 1;
-    transform: scale(1, 1) rotate(0deg);
+    transform: translate3d(0, 0, 0) scale(1, 1) rotate(0deg);
   }
 }
 
-@keyframes splashBracketLeft {
+@keyframes cartoonFloorRipple {
   0% {
     opacity: 0;
-    transform: translate3d(-24px, 0, 0) scale(0.75);
+    transform: scale(0.35);
   }
-  65% {
-    opacity: 1;
-    transform: translate3d(3px, 0, 0) scale(1.05);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes splashBracketRight {
-  0% {
-    opacity: 0;
-    transform: translate3d(24px, 0, 0) scale(0.75);
-  }
-  65% {
-    opacity: 1;
-    transform: translate3d(-3px, 0, 0) scale(1.05);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes splashSlashDraw {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -18px, 0) scaleY(0.2);
-  }
-  68% {
-    opacity: 1;
-    transform: translate3d(0, 2px, 0) scaleY(1.08);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scaleY(1);
-  }
-}
-
-@keyframes splashPlayBounce {
-  0% {
-    opacity: 0;
-    transform: scale(0) rotate(-25deg);
-  }
-  55% {
-    opacity: 1;
-    transform: scale(1.26, 0.84) rotate(8deg);
-  }
-  75% {
-    transform: scale(0.9, 1.12) rotate(-4deg);
-  }
-  90% {
-    transform: scale(1.04, 0.97) rotate(1deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1, 1) rotate(0deg);
-  }
-}
-
-@keyframes splashSparkBurst {
-  0% {
-    opacity: 0;
-    transform: scale(0) translate3d(0, 0, 0);
-  }
-  35% {
-    opacity: 1;
-    transform: scale(1.15) translate3d(var(--tx, 0px), var(--ty, 0px), 0);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.2) translate3d(calc(var(--tx, 0px) * 1.5), calc(var(--ty, 0px) * 1.5), 0);
-  }
-}
-
-@keyframes splashShimmerSweep {
-  0% {
-    transform: translateX(-140%) skewX(-24deg);
-  }
-  100% {
-    transform: translateX(240%) skewX(-24deg);
-  }
-}
-
-@keyframes splashGlowPulse {
-  0% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  50% {
-    opacity: 0.45;
+  32% {
+    opacity: 0.72;
     transform: scale(1.08);
   }
   100% {
-    opacity: 0.3;
-    transform: scale(1);
+    opacity: 0;
+    transform: scale(1.95);
   }
 }
 
-@keyframes splashTextRise {
+@keyframes cartoonBracketLeft {
   0% {
     opacity: 0;
-    transform: translate3d(0, 14px, 0);
+    transform: translate3d(-30px, 0, 0) scale(0.55) rotate(-12deg);
+  }
+  58% {
+    opacity: 1;
+    transform: translate3d(5px, 0, 0) scale(1.1, 0.92) rotate(4deg);
+  }
+  80% {
+    transform: translate3d(-2px, 0, 0) scale(0.97, 1.04) rotate(-1deg);
   }
   100% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) scale(1, 1) rotate(0deg);
   }
 }
 
-.splash-squircle-pop {
-  animation: splashSquirclePop 0.56s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+@keyframes cartoonBracketRight {
+  0% {
+    opacity: 0;
+    transform: translate3d(30px, 0, 0) scale(0.55) rotate(12deg);
+  }
+  58% {
+    opacity: 1;
+    transform: translate3d(-5px, 0, 0) scale(1.1, 0.92) rotate(-4deg);
+  }
+  80% {
+    transform: translate3d(2px, 0, 0) scale(0.97, 1.04) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1) rotate(0deg);
+  }
 }
 
-.splash-bracket-left {
+@keyframes cartoonSlashWhip {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -28px, 0) scale(0.65, 1.45) rotate(10deg);
+  }
+  62% {
+    opacity: 1;
+    transform: translate3d(0, 3px, 0) scale(1.08, 0.88) rotate(-3deg);
+  }
+  84% {
+    transform: translate3d(0, -1px, 0) scale(0.98, 1.03) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1) rotate(0deg);
+  }
+}
+
+@keyframes cartoonPlayPop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-36deg);
+  }
+  52% {
+    opacity: 1;
+    transform: scale(1.34, 0.78) rotate(12deg);
+  }
+  74% {
+    transform: scale(0.88, 1.16) rotate(-6deg);
+  }
+  89% {
+    transform: scale(1.06, 0.96) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1, 1) rotate(0deg);
+  }
+}
+
+@keyframes cartoonStarBurst {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0) rotate(-45deg);
+  }
+  34% {
+    opacity: 1;
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) scale(1.22) rotate(18deg);
+  }
+  72% {
+    opacity: 0.92;
+    transform: translate3d(calc(var(--tx, 0px) * 1.32), calc(var(--ty, 0px) * 1.32), 0) scale(0.92) rotate(55deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(var(--tx, 0px) * 1.65), calc(var(--ty, 0px) * 1.65), 0) scale(0.15) rotate(95deg);
+  }
+}
+
+@keyframes cartoonGlossSweep {
+  0% {
+    opacity: 0;
+    transform: translate3d(-150%, 0, 0) skewX(-24deg);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(260%, 0, 0) skewX(-24deg);
+  }
+}
+
+@keyframes cartoonTitleBounce {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.82);
+  }
+  62% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0) scale(1.04);
+  }
+  84% {
+    transform: translate3d(0, 1px, 0) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes cartoonSubBounce {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.92);
+  }
+  100% {
+    opacity: 0.8;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Cú phóng chiều sâu Warp Zoom xuyên qua tâm màn hình */
+@keyframes warpRingRush {
+  0% {
+    opacity: 0.9;
+    transform: translate3d(0, 0, 0) scale(0.28);
+  }
+  45% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(6.4);
+  }
+}
+
+@keyframes warpSpeedRay {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--ray-deg, 0deg)) translate3d(0, -36px, 0) scaleY(0.25);
+  }
+  28% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--ray-deg, 0deg)) translate3d(0, -460px, 0) scaleY(2.8);
+  }
+}
+
+.cartoon-squircle-drop {
+  animation: cartoonSquircleDrop 0.64s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+.cartoon-floor-ripple {
+  animation: cartoonFloorRipple 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both;
+  will-change: transform, opacity;
+}
+
+.cartoon-bracket-left {
   transform-box: fill-box;
   transform-origin: center;
-  animation: splashBracketLeft 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+  animation: cartoonBracketLeft 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
 }
 
-.splash-bracket-right {
+.cartoon-bracket-right {
   transform-box: fill-box;
   transform-origin: center;
-  animation: splashBracketRight 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+  animation: cartoonBracketRight 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
 }
 
-.splash-slash {
+.cartoon-slash-whip {
   transform-box: fill-box;
   transform-origin: center;
-  animation: splashSlashDraw 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.32s both;
+  animation: cartoonSlashWhip 0.44s cubic-bezier(0.22, 1, 0.36, 1) 0.38s both;
 }
 
-.splash-play-bounce {
+.cartoon-play-pop {
   transform-box: fill-box;
   transform-origin: center;
-  animation: splashPlayBounce 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) 0.48s both;
+  animation: cartoonPlayPop 0.56s cubic-bezier(0.22, 1, 0.36, 1) 0.52s both;
 }
 
-.splash-spark {
-  animation: splashSparkBurst 0.65s ease-out 0.62s both;
+.cartoon-star-burst {
+  animation: cartoonStarBurst 0.76s cubic-bezier(0.16, 1, 0.3, 1) var(--st-delay, 0.6s) both;
+  will-change: transform, opacity;
 }
 
-.splash-shimmer {
-  animation: splashShimmerSweep 0.78s ease-in-out 0.72s both;
+.cartoon-gloss-sweep {
+  animation: cartoonGlossSweep 0.74s cubic-bezier(0.22, 1, 0.36, 1) 0.72s both;
+  will-change: transform, opacity;
 }
 
-.splash-glow-pulse {
-  animation: splashGlowPulse 0.9s ease-out 0.1s both;
+.cartoon-title-bounce {
+  animation: cartoonTitleBounce 0.54s cubic-bezier(0.22, 1, 0.36, 1) 0.58s both;
+  will-change: transform, opacity;
 }
 
-.splash-text-rise {
-  animation: splashTextRise 0.48s var(--ease-ios-spring) 0.58s both;
+.cartoon-sub-bounce {
+  animation: cartoonSubBounce 0.46s cubic-bezier(0.22, 1, 0.36, 1) 0.72s both;
+  will-change: transform, opacity;
 }
 
-.splash-subtitle-rise {
-  animation: splashTextRise 0.48s var(--ease-ios-spring) 0.7s both;
+.warp-ring-rush {
+  animation: warpRingRush 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.warp-ring-rush-delay {
+  animation: warpRingRush 0.82s cubic-bezier(0.16, 1, 0.3, 1) 0.08s forwards;
+  will-change: transform, opacity;
+}
+
+.warp-speed-ray {
+  animation: warpSpeedRay 0.64s cubic-bezier(0.16, 1, 0.3, 1) var(--ray-delay, 0ms) forwards;
+  will-change: transform, opacity;
 }
 
 /* =====================================================================
@@ -795,6 +884,7 @@ html[data-wallpaper-active='true'],
 [data-wallpaper-active='true'] .ide-card,
 [data-wallpaper-active='true'] .glass-surface {
   background-color: color-mix(in srgb, var(--bg-panel) var(--glass-opacity, 78%), transparent) !important;
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.09);
   backdrop-filter: blur(var(--glass-blur, 18px)) saturate(160%);
   -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(160%);
 }
@@ -855,23 +945,40 @@ html.theme-rippling .transition-all {
   z-index: 9999;
 }
 
-/* Chuyển cảnh đồng bộ mượt Welcome Screen -> Home (GPU thuần transform + opacity, KHÔNG remount / KHÔNG blur) */
+/* =====================================================================
+   3D WARP ZOOM ELASTIC ARRIVAL (CARTOON WELCOME -> HOMESCREEN)
+   ===================================================================== */
+
 .home-reveal-exiting .home-reveal-item {
   transition:
-    transform 0.56s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+    transform 0.72s cubic-bezier(0.2, 1.18, 0.32, 1),
+    opacity 0.46s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, opacity;
 }
 
 .home-reveal-waiting .home-reveal-item {
   opacity: 0 !important;
-  transform: translate3d(0, 26px, 0) scale(0.975) !important;
+  transform: translate3d(0, 12px, 0) scale(0.8) !important;
   transition: none !important;
 }
 
-/* Giữ vị trí Header 100% cố định (không translateY) để Splash đo đúng pixel vị trí Logo góc trái */
+/* Dàn thẻ thư viện Playgrounds phóng lao từ chiều sâu 3D bật nhẹ vào hàng */
+.home-reveal-exiting .home-gallery-card {
+  transition:
+    transform 0.74s cubic-bezier(0.2, 1.16, 0.32, 1),
+    opacity 0.46s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.home-reveal-waiting .home-gallery-card {
+  opacity: 0 !important;
+  transform: perspective(1000px) translate3d(0, 40px, 0) scale(0.74) rotateX(10deg) !important;
+  transition: none !important;
+}
+
+/* Giữ vị trí Header 100% cố định (không translateY) để tương thích Native Motion đo rect */
 .home-reveal-exiting .home-reveal-header {
-  transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1) 100ms;
+  transition: opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1) 120ms;
 }
 
 .home-reveal-waiting .home-reveal-header {
@@ -879,74 +986,43 @@ html.theme-rippling .transition-all {
   transition: none !important;
 }
 
-/* Logo góc trên trái trên Home chỉ hiện mượt ngay khoảnh khắc Logo Welcome bay đáp xuống khớp 1:1 */
+/* Logo góc trên trái bật nảy gọn gàng ngay sau cú Warp Zoom lao vào HomeScreen */
 .home-reveal-exiting .home-reveal-logo {
-  transition: opacity 0.22s ease 420ms;
+  transition:
+    transform 0.54s cubic-bezier(0.22, 1.32, 0.36, 1) 150ms,
+    opacity 0.34s ease 150ms;
 }
 
 .home-reveal-waiting .home-reveal-logo {
   opacity: 0 !important;
+  transform: scale(0.45) rotate(-14deg) !important;
   transition: none !important;
 }
 
 .home-reveal-exiting .home-reveal-header-chrome {
   transition:
-    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1) 140ms,
-    opacity 0.38s ease 140ms;
+    transform 0.58s cubic-bezier(0.2, 1.18, 0.32, 1) 190ms,
+    opacity 0.4s ease 190ms;
 }
 
 .home-reveal-waiting .home-reveal-header-chrome {
   opacity: 0 !important;
-  transform: translate3d(0, -8px, 0) !important;
+  transform: translate3d(-12px, 0, 0) scale(0.92) !important;
   transition: none !important;
 }
 
+/* Thanh Liquid Glass Dock bật đàn hồi từ dưới lên chốt khung hình */
 .home-reveal-exiting .home-reveal-nav {
   transition:
-    transform 0.54s cubic-bezier(0.22, 1, 0.36, 1) 150ms,
-    opacity 0.42s ease 150ms;
+    transform 0.68s cubic-bezier(0.22, 1.24, 0.36, 1) 220ms,
+    opacity 0.44s ease 220ms;
   will-change: transform, opacity;
 }
 
 .home-reveal-waiting .home-reveal-nav {
   opacity: 0 !important;
-  transform: translate3d(0, 30px, 0) scale(0.94) !important;
+  transform: translate3d(0, 48px, 0) scale(0.78) !important;
   transition: none !important;
-}
-
-@keyframes splashPortalRing {
-  0% {
-    opacity: 0.85;
-    transform: translate3d(0, 0, 0) scale(0.62);
-  }
-  55% {
-    opacity: 0.45;
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) scale(5.6);
-  }
-}
-
-@keyframes splashPortalRingSoft {
-  0% {
-    opacity: 0.55;
-    transform: translate3d(0, 0, 0) scale(0.5);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) scale(7.2);
-  }
-}
-
-.splash-portal-ring {
-  animation: splashPortalRing 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  will-change: transform, opacity;
-}
-
-.splash-portal-ring-soft {
-  animation: splashPortalRingSoft 0.82s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
-  will-change: transform, opacity;
 }
 
 @keyframes homeCascadeIn {
@@ -1174,8 +1250,8 @@ html.theme-rippling .transition-all {
 .explorer-clean [class~='bg-[#2C2C2E]'],
 .explorer-clean [class~='bg-[#323236]'],
 .explorer-clean [aria-selected='true'] {
-  background-color: var(--bg-active) !important;
-  color: var(--accent-primary) !important;
+  background-color: var(--bg-panel-alt) !important;
+  color: var(--text-primary) !important;
   font-weight: 600 !important;
 }
 
@@ -1460,4 +1536,409 @@ html {
 
 .right-panel-swap {
   animation: rightPanelSwap 0.28s var(--ease-ios-spring) both;
+}
+
+/* Hiệu ứng ánh sáng tinh tế cho bảng Trợ lý AI Gemini 4 */
+@keyframes aiAuroraPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.08);
+  }
+}
+
+.ai-aurora-pulse {
+  animation: aiAuroraPulse 4.6s ease-in-out infinite;
+}
+
+.ai-composer-shell:focus-within {
+  box-shadow:
+    0 12px 30px -12px var(--accent-glow),
+    0 0 0 1.5px color-mix(in srgb, var(--accent-primary) 34%, transparent) !important;
+}
+
+/* =====================================================================
+   APPLE SEQUOIA SEGMENTED CONTROL & CUSTOM SLIDER (ĐỒNG BỘ 12 DARK/LIGHT)
+   ===================================================================== */
+
+.ios-segment-track {
+  background-color: color-mix(in srgb, var(--bg-canvas) 78%, var(--bg-panel));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.ios-segment-active {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow:
+    0 2px 6px -1px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+[data-ui-theme='lavender-light'] .ios-segment-track,
+[data-ui-theme='github-light'] .ios-segment-track,
+[data-ui-theme='rose-pine-dawn'] .ios-segment-track,
+[data-ui-theme='solarized-light'] .ios-segment-track {
+  background-color: var(--bg-panel-alt);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+[data-ui-theme='lavender-light'] .ios-segment-active,
+[data-ui-theme='github-light'] .ios-segment-active,
+[data-ui-theme='rose-pine-dawn'] .ios-segment-active,
+[data-ui-theme='solarized-light'] .ios-segment-active {
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.16);
+}
+
+/* Thanh trượt Apple iOS siêu mượt (bỏ hoàn toàn track xám có viền mặc định của trình duyệt) */
+input[type='range'].ios-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type='range'].ios-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  transition: transform 0.16s var(--ease-ios-bounce);
+}
+
+input[type='range'].ios-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+input[type='range'].ios-slider:active::-webkit-slider-thumb {
+  transform: scale(0.96);
+}
+
+input[type='range'].ios-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.34);
+}
+
+/* =====================================================================
+   MACOS & IPADOS DYNAMIC ISLAND LIQUID GLASS SPOTLIGHT ANIMATIONS
+   ===================================================================== */
+
+@keyframes spotlightBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spotlightBackdropOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Hiệu ứng nở lỏng từ viên thuốc Dynamic Island -> Cửa sổ Spotlight */
+@keyframes spotlightShellIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -26px, 0) scale(0.86);
+    clip-path: inset(0% 24% 84% 24% round 999px);
+  }
+  26% {
+    opacity: 1;
+    transform: translate3d(0, -4px, 0) scale(1.006);
+    clip-path: inset(0% 2% 72% 2% round 28px);
+  }
+  72% {
+    opacity: 1;
+    transform: translate3d(0, 1.5px, 0) scale(1.002);
+    clip-path: inset(0% 0% 0% 0% round 24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    clip-path: inset(0% 0% 0% 0% round 24px);
+  }
+}
+
+@keyframes spotlightShellOut {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    clip-path: inset(0% 0% 0% 0% round 24px);
+  }
+  55% {
+    opacity: 0.78;
+    transform: translate3d(0, -8px, 0) scale(0.95);
+    clip-path: inset(0% 8% 72% 8% round 28px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -22px, 0) scale(0.86);
+    clip-path: inset(0% 24% 85% 24% round 999px);
+  }
+}
+
+/* Đổ bóng + Hào quang đồng bộ nhịp nở từ viên thuốc -> toàn cửa sổ */
+@keyframes spotlightGlowIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -26px, 0) scaleX(0.48) scaleY(0.14);
+  }
+  28% {
+    opacity: 0.9;
+    transform: translate3d(0, -4px, 0) scaleX(0.96) scaleY(0.28);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleX(1) scaleY(1);
+  }
+}
+
+@keyframes spotlightGlowOut {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleX(1) scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -22px, 0) scaleX(0.46) scaleY(0.14);
+  }
+}
+
+/* Quầng sáng lăng kính nở nhẹ ở đỉnh Spotlight lúc vừa bật */
+@keyframes spotlightPrismBloom {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, 0, 0) scale(0.45);
+  }
+  42% {
+    opacity: 0.92;
+    transform: translate3d(-50%, 0, 0) scale(1.18);
+  }
+  100% {
+    opacity: 0.55;
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
+}
+
+@keyframes spotlightShimmerSweep {
+  0% {
+    opacity: 0;
+    transform: translate3d(-115%, 0, 0);
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(130%, 0, 0);
+  }
+}
+
+@keyframes spotlightIconPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) rotate(-22deg);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1.12) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes spotlightRowEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(-6px, 10px, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes spotlightInspectorEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(16px, 6px, 0) scale(0.965);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes spotlightPreviewSwap {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 7px, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.spotlight-backdrop-in {
+  animation: spotlightBackdropIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.spotlight-backdrop-out {
+  animation: spotlightBackdropOut 0.21s ease-in forwards;
+}
+
+.spotlight-shell-in {
+  animation: spotlightShellIn 0.46s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, clip-path;
+  transform-origin: top center;
+}
+
+.spotlight-shell-out {
+  animation: spotlightShellOut 0.21s cubic-bezier(0.4, 0, 1, 1) forwards;
+  will-change: transform, opacity, clip-path;
+  transform-origin: top center;
+}
+
+.spotlight-glow-in {
+  animation: spotlightGlowIn 0.46s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+  transform-origin: top center;
+}
+
+.spotlight-glow-out {
+  animation: spotlightGlowOut 0.21s cubic-bezier(0.4, 0, 1, 1) forwards;
+  will-change: transform, opacity;
+  transform-origin: top center;
+}
+
+.spotlight-prism-bloom {
+  animation: spotlightPrismBloom 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.spotlight-shimmer-sweep {
+  animation: spotlightShimmerSweep 0.72s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+  will-change: transform, opacity;
+}
+
+.spotlight-icon-pop {
+  animation: spotlightIconPop 0.44s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both;
+  will-change: transform, opacity;
+}
+
+.spotlight-row-enter {
+  animation: spotlightRowEnter 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.spotlight-inspector-enter {
+  animation: spotlightInspectorEnter 0.38s cubic-bezier(0.16, 1, 0.3, 1) 0.11s both;
+}
+
+.spotlight-preview-swap {
+  animation: spotlightPreviewSwap 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-backdrop-in,
+  .spotlight-backdrop-out,
+  .spotlight-shell-in,
+  .spotlight-shell-out,
+  .spotlight-glow-in,
+  .spotlight-glow-out,
+  .spotlight-prism-bloom,
+  .spotlight-shimmer-sweep,
+  .spotlight-icon-pop,
+  .spotlight-row-enter,
+  .spotlight-inspector-enter,
+  .spotlight-preview-swap {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
+}
+
+/* =====================================================================
+   APPLE LIQUID GLASS FLOATING DOCK BAR (ĐỒNG BỘ 12 DARK & LIGHT THEMES)
+   ===================================================================== */
+
+.apple-liquid-dock {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg-panel) 62%, rgba(255, 255, 255, 0.14)) 0%,
+    color-mix(in srgb, var(--bg-panel) 54%, transparent) 100%
+  );
+  backdrop-filter: blur(42px) saturate(210%) brightness(1.06);
+  -webkit-backdrop-filter: blur(42px) saturate(210%) brightness(1.06);
+  box-shadow:
+    0 18px 44px -12px rgba(0, 0, 0, 0.48),
+    0 4px 14px -4px rgba(0, 0, 0, 0.24),
+    inset 0 1.5px 0.5px rgba(255, 255, 255, 0.2),
+    inset 0 -1px 1px color-mix(in srgb, var(--accent-primary) 18%, rgba(255, 255, 255, 0.06));
+}
+
+.apple-liquid-dock-active {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-primary) 26%, rgba(255, 255, 255, 0.16)) 0%,
+    color-mix(in srgb, var(--accent-primary) 14%, transparent) 100%
+  );
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.28),
+    0 6px 16px -6px var(--accent-glow);
+}
+
+[data-ui-theme='lavender-light'] .apple-liquid-dock,
+[data-ui-theme='github-light'] .apple-liquid-dock,
+[data-ui-theme='rose-pine-dawn'] .apple-liquid-dock,
+[data-ui-theme='solarized-light'] .apple-liquid-dock {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #ffffff 74%, transparent) 0%,
+    color-mix(in srgb, var(--bg-panel) 58%, transparent) 100%
+  );
+  backdrop-filter: blur(42px) saturate(200%) brightness(1.04);
+  -webkit-backdrop-filter: blur(42px) saturate(200%) brightness(1.04);
+  box-shadow:
+    0 18px 42px -14px rgba(15, 23, 42, 0.22),
+    0 4px 14px -4px rgba(15, 23, 42, 0.08),
+    inset 0 1.5px 0.5px rgba(255, 255, 255, 0.92),
+    inset 0 -1px 1px color-mix(in srgb, var(--accent-primary) 16%, rgba(255, 255, 255, 0.55));
+}
+
+[data-ui-theme='lavender-light'] .apple-liquid-dock-active,
+[data-ui-theme='github-light'] .apple-liquid-dock-active,
+[data-ui-theme='rose-pine-dawn'] .apple-liquid-dock-active,
+[data-ui-theme='solarized-light'] .apple-liquid-dock-active {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-primary) 20%, rgba(255, 255, 255, 0.72)) 0%,
+    color-mix(in srgb, var(--accent-primary) 12%, rgba(255, 255, 255, 0.45)) 100%
+  );
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.9),
+    0 6px 16px -6px var(--accent-glow);
 }
